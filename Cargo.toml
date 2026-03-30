@@ -19,10 +19,11 @@ members = [
 version = "1.2.4"
 edition = "2024"
 
-authors = ["Nathan Adams <dinnerbone@dinnerbone.com>", "Craig McLure <craig@mclure.net>", "Lars Mühlbauer <lm41@dismail.de>"]
+authors = ["Nathan Adams <dinnerbone@dinnerbone.com>", "Craig McLure <craig@mclure.net>", "Lars Mühlbauer <lm41@dismail.de>", "Sergio Gallegos"]
 license = "MIT"
 
 repository = "https://github.com/sergiogallegos/macxlr"
+homepage = "https://github.com/sergiogallegos/macxlr"
 
 [workspace.dependencies]
 log = "0.4.28"

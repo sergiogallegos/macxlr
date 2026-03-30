@@ -13,7 +13,11 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 #[derive(Parser, Debug)]
-#[command(about, version, author)]
+#[command(
+    about = "MacXLR command-line client for controlling a TC-Helicon GoXLR or GoXLR Mini.",
+    version,
+    author
+)]
 #[command(arg_required_else_help = true)]
 pub struct Cli {
     /// The specific device's serial number to execute commands on.

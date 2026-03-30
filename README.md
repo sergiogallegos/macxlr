@@ -7,6 +7,12 @@ GoXLR or GoXLR Mini. It is based on the original
 [GoXLR Utility](https://github.com/GoXLR-on-Linux/goxlr-utility), but this fork is intended to
 evolve independently with macOS-specific fixes, packaging, and quality-of-life improvements.
 
+Project links:
+
+* Repository: [github.com/sergiogallegos/macxlr](https://github.com/sergiogallegos/macxlr)
+* Issues: [github.com/sergiogallegos/macxlr/issues](https://github.com/sergiogallegos/macxlr/issues)
+* Releases: [github.com/sergiogallegos/macxlr/releases](https://github.com/sergiogallegos/macxlr/releases)
+
 ## Features
 
 * Full control over the GoXLR and GoXLR Mini (Similar to the official App)
@@ -20,11 +26,17 @@ evolve independently with macOS-specific fixes, packaging, and quality-of-life i
 * Streamdeck Integration (
   through [The StreamDeck Repository](https://github.com/FrostyCoolSlug/goxlr-utility-streamdeck))
 
+## Status
+
+MacXLR is currently focused on macOS support and day-to-day usability. The USB control path is
+working well, and the fork now includes local macOS app packaging plus additional CoreAudio
+recovery work. Some macOS audio-routing behavior is still being refined, so treat the project as
+active fork development rather than a finished drop-in replacement for every upstream workflow.
+
 ## Downloads
 
-MacXLR is currently being developed as an independent fork for macOS. If you publish releases for
-this fork, point users at your own GitHub Releases page rather than the upstream GoXLR Utility
-releases.
+Published builds for this fork should live on the MacXLR releases page:
+[github.com/sergiogallegos/macxlr/releases](https://github.com/sergiogallegos/macxlr/releases)
 
 For local development and daily use on macOS, the simplest path is the included local app bundle
 script:
@@ -33,8 +45,6 @@ script:
 ./scripts/build-local-macos-app.sh
 open "dist/MacXLR.app"
 ```
-
-Attribution note:
 
 MacXLR remains based on the original GoXLR Utility project, but the packaging, fixes, and fork
 direction in this repository are intentionally separate from upstream.
@@ -50,13 +60,9 @@ direction in this repository are intentionally separate from upstream.
 
 ## Getting Started
 
-Once installed, you can launch the Utility using the `MacXLR` item in your Applications Menu, this will launch
-the utility and configuration UI. The UI will then be accessible via the system tray icon, or (if you don't have a tray)
-by re-running the `MacXLR` menu item.
-
-If you're running on Linux, a first configuration step should be to enable `Autostart on Login`
-via System -> Settings. Windows users will get the choice during installation. If you change your
-mind, you can change the setting.
+Once installed, you can launch the app using the `MacXLR` item in your Applications folder or app
+launcher. That starts the daemon and opens the configuration UI. The UI is then accessible through
+the tray icon or, if you do not have a tray, by launching `MacXLR` again.
 
 If you want to import your profiles from the official app, simply click on the folder icon in the top right of the
 relevant profiles pane (either Main or Mic) which will open the directory in your file browser. Copy the profile across
@@ -69,18 +75,14 @@ Gate Amount to 0, then reconfigure it once your mic is working. Once done, go ex
 
 ## The UI
 
-The Utility's UI is web based and served directly from the utility to your web browser of choice (if configured, it
-can also be served to a web browser on another computer). The Utility also provides an 'Application' which wraps the
-web UI into a dedicated app. If you're using the Utility on Windows this option is presented to you during install.
-The UI design was modelled around the official application in an attempt to provide a familiar interface for those
-moving from Windows to other platforms, rather than forcing people to learn a new configuration paradigm.
+MacXLR serves a web UI directly from the daemon and can also wrap that UI in a dedicated app on
+macOS. The interface stays close to the official GoXLR application so existing users do not have
+to relearn the mixer from scratch.
 
 ![image](https://github.com/GoXLR-on-Linux/goxlr-utility/assets/574943/8f14bd2c-e67a-42e5-bd9f-b3cb367e171d)
 
-If you're running on Linux, the 'Application' isn't provided as part of the base utility installation. If you'd
-prefer to use it, check out the [GoXLR UI Repository](https://github.com/frostyCoolSlug/goxlr-utility-ui/), which
-provides various builds for distributions. Once installed, you should be able to go to System -> Utility Settings
-and change the UI Handler there.
+MacXLR is currently macOS-first. If you are working from upstream on Linux or Windows, use the
+original GoXLR Utility project and its platform-specific packaging.
 
 ## Building
 
@@ -101,6 +103,15 @@ open "dist/MacXLR.app"
 This produces a local app bundle containing the Rust binaries from `target/release/`. It does not
 build the separate Tauri desktop UI project or a signed `.pkg`, but it gives you a native-feeling
 launcher for local testing and personal use on macOS.
+
+## Support
+
+If you hit a MacXLR-specific bug or regression, file it here:
+[github.com/sergiogallegos/macxlr/issues](https://github.com/sergiogallegos/macxlr/issues)
+
+If the problem is clearly upstream behavior or general GoXLR Utility behavior unrelated to this
+fork, the original project may still be the right reference:
+[github.com/GoXLR-on-Linux/goxlr-utility](https://github.com/GoXLR-on-Linux/goxlr-utility)
 
 ## Disclaimer
 

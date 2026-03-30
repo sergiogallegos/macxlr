@@ -1,6 +1,6 @@
 [package]
 name = "goxlr-initialiser"
-description = "Finds, checks and initialises any unconfigured GoXLR devices"
+description = "MacXLR helper for finding and initialising unconfigured GoXLR devices."
 categories = ["hardware-support", "command-line-utilities"]
 
 version.workspace = true

@@ -1,7 +1,7 @@
 [package]
 name = "goxlr-client"
 build = "build.rs"
-description = "Allows control of a TC-Helicon GoXLR or GoXLR Mini, by interacting with a running daemon."
+description = "MacXLR command-line client for controlling a TC-Helicon GoXLR or GoXLR Mini."
 categories = ["hardware-support", "command-line-utilities"]
 
 version.workspace = true
@@ -39,4 +39,3 @@ goxlr-types = { path = "../types", features = ["clap"] }
 
 clap = { workspace = true }
 clap_complete = { workspace = true }
-

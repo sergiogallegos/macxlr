@@ -1,6 +1,6 @@
 [package]
 name = "goxlr-daemon"
-description = "Allows control of a TC-Helicon GoXLR or GoXLR Mini, by maintaining an interaction with it over USB in the background."
+description = "MacXLR background daemon for controlling a TC-Helicon GoXLR or GoXLR Mini."
 categories = ["hardware-support", "command-line-utilities"]
 
 version.workspace = true

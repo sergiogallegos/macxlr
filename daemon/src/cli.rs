@@ -3,7 +3,11 @@ use directories::ProjectDirs;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command(about, version, author)]
+#[command(
+    about = "MacXLR background daemon for controlling a TC-Helicon GoXLR or GoXLR Mini.",
+    version,
+    author
+)]
 pub struct Cli {
     /// Minimum log level to print out
     #[arg(long, value_enum)]

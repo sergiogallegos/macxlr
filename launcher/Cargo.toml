@@ -1,5 +1,6 @@
 [package]
 name = "goxlr-launcher"
+description = "MacXLR launcher that starts the daemon and activates the UI."
 
 version.workspace = true
 edition.workspace = true
