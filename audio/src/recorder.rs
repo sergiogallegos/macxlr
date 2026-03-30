@@ -47,9 +47,18 @@ pub struct RecorderState {
 
 impl Debug for BufferedRecorder {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let producer_count = self
+            .producers
+            .lock()
+            .map(|producers| producers.len())
+            .unwrap_or_else(|error| {
+                warn!("Unable to inspect recorder producers: {}", error);
+                0
+            });
+
         f.debug_struct("BufferedRecorder")
             .field("device", &self.devices)
-            .field("producers", &self.producers.lock().unwrap().len())
+            .field("producers", &producer_count)
             .finish()
     }
 }
@@ -82,11 +91,9 @@ impl BufferedRecorder {
         // Convert the list of Strings into a Regexp vec..
         let regex = devices
             .iter()
-            .map(|expression| {
-                Regex::new(expression)
-                    .unwrap_or_else(|_| panic!("Unable to Parse Regular Expression: {expression}"))
-            })
-            .collect();
+            .map(|expression| Regex::new(expression))
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|error| anyhow::anyhow!("Unable to parse recorder regex: {}", error))?;
 
         Ok(Self {
             devices: regex,
@@ -133,25 +140,35 @@ impl BufferedRecorder {
                 continue;
             } else {
                 // Read the latest samples from the input...
-                match input.as_mut().unwrap().read() {
+                let Some(active_input) = input.as_mut() else {
+                    continue;
+                };
+                match active_input.read() {
                     Ok(samples) => {
                         if self.buffer_size > 0
                             && let Err(e) = self.buffer.write_into(&samples)
                         {
                             warn!("Error writing samples to buffer: {}", e);
                         }
-                        for producer in self.producers.lock().unwrap().iter() {
-                            let result = producer.producer.write(&samples);
-                            if let Err(e) = result {
-                                match e {
-                                    RbError::Full => {
-                                        // This can happen when buffers are full prior to general
-                                        // setup being complete, so we'll just ignore it for now.
-                                    }
-                                    e => {
-                                        warn!("Error writing to producer: {:?}", e);
+                        match self.producers.lock() {
+                            Ok(producers) => {
+                                for producer in producers.iter() {
+                                    let result = producer.producer.write(&samples);
+                                    if let Err(e) = result {
+                                        match e {
+                                            RbError::Full => {
+                                                // This can happen when buffers are full prior to general
+                                                // setup being complete, so we'll just ignore it for now.
+                                            }
+                                            e => {
+                                                warn!("Error writing to producer: {:?}", e);
+                                            }
+                                        }
                                     }
                                 }
+                            }
+                            Err(error) => {
+                                warn!("Unable to access recorder producers: {}", error);
                             }
                         }
                     }
@@ -174,9 +191,16 @@ impl BufferedRecorder {
                 // Update the timer for next poll regardless..
                 now = Instant::now();
 
-                if !self.producers.lock().unwrap().is_empty() {
-                    // Something is actively recording, don't break the loop..
-                    continue;
+                match self.producers.lock() {
+                    Ok(producers) if !producers.is_empty() => {
+                        // Something is actively recording, don't break the loop..
+                        continue;
+                    }
+                    Ok(_) => {}
+                    Err(error) => {
+                        warn!("Unable to inspect recorder producers: {}", error);
+                        continue;
+                    }
                 }
 
                 // If the EBU failed to initialise, we're SOL really..
@@ -199,8 +223,9 @@ impl BufferedRecorder {
                 }
 
                 // If we get here, nothing has stopped us, tear down the audio handler, and sleep..
-                input.unwrap().flush();
-                input = None;
+                if let Some(mut active_input) = input.take() {
+                    active_input.flush();
+                }
                 self.is_ready.store(false, Ordering::Relaxed);
                 self.buffer.clear();
             }
@@ -218,14 +243,21 @@ impl BufferedRecorder {
     }
 
     pub fn add_producer(&self, producer: RingProducer) {
-        self.producers.lock().unwrap().push(producer);
+        match self.producers.lock() {
+            Ok(mut producers) => producers.push(producer),
+            Err(error) => {
+                warn!("Unable to register recorder producer: {}", error);
+            }
+        }
     }
 
     pub fn del_producer(&self, producer_id: u32) {
-        self.producers
-            .lock()
-            .unwrap()
-            .retain(|x| x.id != producer_id);
+        match self.producers.lock() {
+            Ok(mut producers) => producers.retain(|x| x.id != producer_id),
+            Err(error) => {
+                warn!("Unable to remove recorder producer {}: {}", producer_id, error);
+            }
+        }
     }
 
     pub fn record(&self, path: &Path, state: RecorderState) -> Result<()> {

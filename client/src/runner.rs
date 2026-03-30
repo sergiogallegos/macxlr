@@ -64,7 +64,13 @@ pub async fn run_cli() -> Result<()> {
     } else if client.status().mixers.is_empty() {
         return Err(anyhow!("No GoXLR Devices are Connected."));
     } else if client.status().mixers.len() == 1 {
-        client.status().mixers.keys().next().unwrap().to_owned()
+        client
+            .status()
+            .mixers
+            .keys()
+            .next()
+            .cloned()
+            .ok_or_else(|| anyhow!("No GoXLR Devices are Connected."))?
     } else {
         for mixer in client.status().mixers.values() {
             println!(

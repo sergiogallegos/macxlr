@@ -47,7 +47,7 @@ async fn get_connection() -> Result<LocalSocketStream> {
         .map_err(anyhow::Error::msg)
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 fn launch_daemon() -> Result<()> {
     use nix::unistd::execve;
     use std::env;
@@ -70,6 +70,28 @@ fn launch_daemon() -> Result<()> {
 
         execve::<CString, CString>(&c_path, c_params.as_slice(), c_env.as_slice())?;
     }
+    bail!("Unable to Locate GoXLR Daemon Binary");
+}
+
+#[cfg(target_os = "macos")]
+fn launch_daemon() -> Result<()> {
+    use std::process::{Command, Stdio, exit};
+
+    if let Some(path) = locate_daemon_binary() {
+        let mut command = Command::new(&path);
+        command.arg("--start-ui");
+        command.stdin(Stdio::null());
+        command.stdout(Stdio::null());
+        command.stderr(Stdio::null());
+
+        if let Some(parent) = path.parent() {
+            command.current_dir(parent);
+        }
+
+        command.spawn()?;
+        exit(0);
+    }
+
     bail!("Unable to Locate GoXLR Daemon Binary");
 }
 
@@ -102,7 +124,7 @@ fn launch_daemon() -> Result<()> {
             command.current_dir(parent);
         }
 
-        command.spawn().expect("Unable to Launch Child Process");
+        command.spawn()?;
         exit(0);
     }
 
@@ -133,13 +155,16 @@ fn locate_daemon_binary() -> Option<PathBuf> {
     let bin_name = get_daemon_binary_name();
 
     // There are three possible places to check for this, the CWD, the binary WD, and $PATH
-    let cwd = std::env::current_dir().unwrap().join(bin_name.clone());
-    if cwd.exists() {
-        binary_path.replace(cwd);
+    if let Ok(cwd) = std::env::current_dir() {
+        let cwd = cwd.join(bin_name.clone());
+        if cwd.exists() {
+            binary_path.replace(cwd);
+        }
     }
 
     if binary_path.is_none()
-        && let Some(parent) = std::env::current_exe().unwrap().parent()
+        && let Ok(current_exe) = std::env::current_exe()
+        && let Some(parent) = current_exe.parent()
     {
         let bin = parent.join(bin_name.clone());
         if bin.exists() {

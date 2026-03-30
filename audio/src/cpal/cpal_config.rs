@@ -1,6 +1,7 @@
 use anyhow::{Result, bail};
 use cpal::Device;
 use cpal::traits::{DeviceTrait, HostTrait};
+use log::warn;
 
 pub struct CpalConfiguration {}
 
@@ -125,10 +126,23 @@ impl CpalConfiguration {
 
         let available_hosts = cpal::available_hosts();
         for host_id in available_hosts {
-            let host = cpal::host_from_id(host_id).unwrap();
-            let devices = host.output_devices().unwrap();
+            let Ok(host) = cpal::host_from_id(host_id) else {
+                warn!("Unable to load CPAL host {}", host_id.name());
+                continue;
+            };
+            let Ok(devices) = host.output_devices() else {
+                warn!("Unable to enumerate output devices for host {}", host_id.name());
+                continue;
+            };
             for device in devices {
-                list.push(format!("{}*{}", host_id.name(), device.name().unwrap()));
+                match device.name() {
+                    Ok(name) => list.push(format!("{}*{}", host_id.name(), name)),
+                    Err(error) => warn!(
+                        "Unable to read output device name for host {}: {}",
+                        host_id.name(),
+                        error
+                    ),
+                }
             }
         }
         list
@@ -139,10 +153,23 @@ impl CpalConfiguration {
 
         let available_hosts = cpal::available_hosts();
         for host_id in available_hosts {
-            let host = cpal::host_from_id(host_id).unwrap();
-            let devices = host.input_devices().unwrap();
+            let Ok(host) = cpal::host_from_id(host_id) else {
+                warn!("Unable to load CPAL host {}", host_id.name());
+                continue;
+            };
+            let Ok(devices) = host.input_devices() else {
+                warn!("Unable to enumerate input devices for host {}", host_id.name());
+                continue;
+            };
             for device in devices {
-                list.push(format!("{}*{}", host_id.name(), device.name().unwrap()));
+                match device.name() {
+                    Ok(name) => list.push(format!("{}*{}", host_id.name(), name)),
+                    Err(error) => warn!(
+                        "Unable to read input device name for host {}: {}",
+                        host_id.name(),
+                        error
+                    ),
+                }
             }
         }
         list

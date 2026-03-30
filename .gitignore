@@ -9,3 +9,5 @@
 
 # Used by CI to make distributables
 /deployment
+/dist/
+.DS_Store

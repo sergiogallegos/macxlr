@@ -18,6 +18,7 @@ use coreaudio_sys::{
     AudioDeviceID, AudioObjectGetPropertyData, AudioObjectGetPropertyDataSize, AudioObjectID,
     AudioObjectPropertyAddress, AudioObjectSetPropertyData, AudioValueTranslation, KERN_SUCCESS,
     kAudioAggregateDevicePropertyFullSubDeviceList, kAudioDevicePropertyDeviceUID,
+    kAudioDevicePropertyDeviceNameCFString,
     kAudioDevicePropertyPreferredChannelsForStereo, kAudioHardwareNoError,
     kAudioHardwarePropertyDevices, kAudioHardwarePropertyPlugInForBundleID,
     kAudioObjectPropertyElementMaster, kAudioObjectPropertyScopeGlobal,
@@ -30,9 +31,10 @@ use io_kit_sys::{
     IOIteratorNext, IORegistryEntryCreateCFProperties, IOServiceGetMatchingServices,
     IOServiceMatching, kIOMasterPortDefault,
 };
+use log::{debug, trace, warn};
 
 const CORE_AUDIO_UID: &str = "com.apple.audio.CoreAudio";
-const AGGREGATE_PREFIX: &str = "GoXLR-Utility::Aggregate";
+const AGGREGATE_PREFIX: &str = "MacXLR::Aggregate";
 const LEGACY_PREFIX: &str = "com.adecorp.goxlr";
 
 pub struct CoreAudioDevice {
@@ -61,8 +63,9 @@ pub fn get_id_for_uid(uid: &str) -> anyhow::Result<AudioObjectID> {
         bail!("Error Lookup up Bundle ID: {}", status);
     }
 
-    // If our size is 0, something's gone terribly wrong :D
-    assert_ne!(size, 0);
+    if size == 0 {
+        bail!("CoreAudio plugin lookup returned an empty response");
+    }
 
     let mut plugin_id = kAudioObjectUnknown;
     let plugin_ref = CFString::new(uid);
@@ -119,6 +122,36 @@ pub fn get_uid_for_id(id: AudioObjectID) -> anyhow::Result<String> {
     };
 
     Ok(uid.to_string())
+}
+
+pub fn get_name_for_id(id: AudioObjectID) -> anyhow::Result<String> {
+    let properties = AudioObjectPropertyAddress {
+        mSelector: kAudioDevicePropertyDeviceNameCFString,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMaster,
+    };
+
+    let name: CFStringRef = null();
+    let size = mem::size_of::<CFStringRef>();
+
+    let name = unsafe {
+        let status = AudioObjectGetPropertyData(
+            id,
+            &properties,
+            0,
+            null(),
+            &size as *const _ as *mut _,
+            &name as *const _ as *mut _,
+        );
+
+        if status != kAudioHardwareNoError as i32 {
+            bail!("Error Extracting Device Name for {}", id);
+        }
+
+        CFString::wrap_under_get_rule(name)
+    };
+
+    Ok(name.to_string())
 }
 
 pub fn create_aggregate_device(channel: String, device: &CoreAudioDevice) -> Result<AudioDeviceID> {
@@ -400,23 +433,47 @@ pub fn get_goxlr_devices() -> Result<Vec<CoreAudioDevice>> {
         // Check to see if this result includes 'idVendor' and 'idProduct'..
         if properties.contains_key(&pid) && properties.contains_key(&vid) {
             // Pull out the values..
-            let vid = properties.get(&vid).downcast::<CFNumber>().unwrap();
-            let pid = properties.get(&pid).downcast::<CFNumber>().unwrap();
+            let Some(vid) = properties.get(&vid).downcast::<CFNumber>() else {
+                warn!("IOAudioEngine contained non-numeric idVendor");
+                continue;
+            };
+            let Some(pid) = properties.get(&pid).downcast::<CFNumber>() else {
+                warn!("IOAudioEngine contained non-numeric idProduct");
+                continue;
+            };
 
             // Check whether the Vendor is TC-Helicon..
-            if vid.to_i32().unwrap() != VID_GOXLR as i32 {
+            let Some(vid) = vid.to_i32() else {
+                warn!("IOAudioEngine contained unparseable idVendor");
+                continue;
+            };
+            if vid != VID_GOXLR as i32 {
                 continue;
             }
 
-            let pid = pid.to_i32().unwrap();
+            let Some(pid) = pid.to_i32() else {
+                warn!("IOAudioEngine contained unparseable idProduct");
+                continue;
+            };
             // Check whether we're a GoXLR
             if pid == PID_GOXLR_FULL as i32 || pid == PID_GOXLR_MINI as i32 {
                 // Get the UID of this device..
                 if properties.contains_key(&uid) {
-                    let uid = properties.get(&uid).downcast::<CFString>().unwrap();
+                    let Some(uid) = properties.get(&uid).downcast::<CFString>() else {
+                        warn!("GoXLR device contained non-string CoreAudio UID");
+                        continue;
+                    };
 
                     if properties.contains_key(&dsc) {
-                        let description = properties.get(&dsc).downcast::<CFString>().unwrap();
+                        let Some(description) = properties.get(&dsc).downcast::<CFString>() else {
+                            warn!("GoXLR device contained non-string description");
+                            continue;
+                        };
+                        debug!(
+                            "Found GoXLR CoreAudio device: {} ({})",
+                            description,
+                            uid
+                        );
                         devices.push(CoreAudioDevice {
                             display_name: description.to_string(),
                             uid: uid.to_string(),
@@ -427,5 +484,85 @@ pub fn get_goxlr_devices() -> Result<Vec<CoreAudioDevice>> {
         }
     }
 
+    if devices.is_empty() {
+        trace!("No GoXLR devices found via IOAudioEngine metadata, falling back to CoreAudio device list");
+
+        for device_id in get_all_audio_device_ids()? {
+            let Ok(uid) = get_uid_for_id(device_id) else {
+                continue;
+            };
+
+            if uid.starts_with(AGGREGATE_PREFIX) || uid.starts_with(LEGACY_PREFIX) {
+                continue;
+            }
+
+            let Ok(display_name) = get_name_for_id(device_id) else {
+                continue;
+            };
+
+            let uid_lower = uid.to_lowercase();
+            let name_lower = display_name.to_lowercase();
+            let looks_like_goxlr = uid_lower.contains("goxlr")
+                || name_lower.contains("goxlr")
+                || uid_lower.contains("1220")
+                || name_lower.contains("tc-helicon");
+
+            if looks_like_goxlr {
+                trace!(
+                    "Found GoXLR CoreAudio device via device-list fallback: {} ({})",
+                    display_name, uid
+                );
+                devices.push(CoreAudioDevice { display_name, uid });
+            }
+        }
+    }
+
+    devices.sort_by(|left, right| left.uid.cmp(&right.uid));
+    devices.dedup_by(|left, right| left.uid == right.uid);
+
     Ok(devices)
+}
+
+fn get_all_audio_device_ids() -> Result<Vec<AudioDeviceID>> {
+    let properties = AudioObjectPropertyAddress {
+        mSelector: kAudioHardwarePropertyDevices,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMaster,
+    };
+
+    let size = 0u32;
+    let status = unsafe {
+        AudioObjectGetPropertyDataSize(
+            kAudioObjectSystemObject,
+            &properties,
+            0,
+            null(),
+            &size as *const _ as *mut _,
+        )
+    };
+    if status != kAudioHardwareNoError as i32 {
+        bail!("CoreAudio Error: {}", status);
+    }
+
+    let count: usize = size as usize / mem::size_of::<AudioDeviceID>();
+    let mut device_ids: Vec<AudioDeviceID> = vec![];
+    device_ids.reserve_exact(count);
+    let status = unsafe {
+        let status = AudioObjectGetPropertyData(
+            kAudioObjectSystemObject,
+            &properties,
+            0,
+            null(),
+            &size as *const _ as *mut _,
+            device_ids.as_mut_ptr() as *mut _,
+        );
+        device_ids.set_len(count);
+        status
+    };
+
+    if status != kAudioHardwareNoError as i32 {
+        bail!("CoreAudio Error: {}", status);
+    }
+
+    Ok(device_ids)
 }

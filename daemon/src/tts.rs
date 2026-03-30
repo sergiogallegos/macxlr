@@ -74,12 +74,12 @@ impl TTS {
     any normal behaviours because TTS didn't work.
      */
     pub async fn speak_tts(&mut self, message: String) {
-        if self.settings.get_tts_enabled().await.is_none() {
+        let Some(enabled) = self.settings.get_tts_enabled().await else {
             // TTS isn't available..
             return;
-        }
+        };
 
-        if !self.settings.get_tts_enabled().await.unwrap() {
+        if !enabled {
             return;
         }
 
@@ -115,12 +115,10 @@ impl TTS {
 
 pub async fn spawn_tts_service(settings: SettingsHandle, rx: Receiver<String>, shutdown: Shutdown) {
     info!("Starting TTS Service..");
-    let tts = TTS::new(settings);
-    if tts.is_err() {
-        warn!("Unable to Start TTS Service");
-        return;
+    match TTS::new(settings) {
+        Ok(mut tts) => tts.listen(rx, shutdown).await,
+        Err(error) => warn!("Unable to Start TTS Service: {}", error),
     }
-    tts.unwrap().listen(rx, shutdown).await;
 }
 
 /*

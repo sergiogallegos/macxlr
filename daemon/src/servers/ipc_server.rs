@@ -44,7 +44,17 @@ async fn ipc_tidy() -> Result<()> {
     }
 
     debug!("Connected to socket, seeing if there's a Daemon on the other side..");
-    let connection = connection.unwrap();
+    let connection = match connection {
+        Ok(connection) => connection,
+        Err(error) => {
+            if cfg!(windows) {
+                bail!("Named Pipe Error: {}", error);
+            }
+            debug!("Unable to connect to existing socket, removing stale socket file..");
+            fs::remove_file(SOCKET_PATH)?;
+            return Ok(());
+        }
+    };
 
     let mut socket: Socket<DaemonResponse, DaemonRequest> = Socket::new(connection);
     if let Err(e) = socket.send(DaemonRequest::Ping).await {

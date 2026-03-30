@@ -59,7 +59,16 @@ impl MicProfileAdapter {
             DEFAULT_MIC_PROFILE_NAME.to_string(),
             Cursor::new(DEFAULT_MIC_PROFILE),
         )
-        .expect("Default mic profile isn't available")
+        .unwrap_or_else(|error| panic!("Default mic profile isn't available: {}", error))
+    }
+
+    fn enum_value<T: Copy>(
+        mut iter: impl Iterator<Item = T>,
+        index: usize,
+        label: &str,
+    ) -> T {
+        iter.nth(index)
+            .unwrap_or_else(|| panic!("Invalid {} enum index {}", label, index))
     }
 
     pub fn from_reader<R: Read + Seek>(name: String, reader: R) -> Result<Self> {
@@ -177,12 +186,16 @@ impl MicProfileAdapter {
     pub fn noise_gate_ipc(&self) -> NoiseGate {
         NoiseGate {
             threshold: self.profile.gate().threshold(),
-            attack: GateTimes::iter()
-                .nth(self.profile.gate().attack() as usize)
-                .unwrap(),
-            release: GateTimes::iter()
-                .nth(self.profile.gate().release() as usize)
-                .unwrap(),
+            attack: Self::enum_value(
+                GateTimes::iter(),
+                self.profile.gate().attack() as usize,
+                "gate attack",
+            ),
+            release: Self::enum_value(
+                GateTimes::iter(),
+                self.profile.gate().release() as usize,
+                "gate release",
+            ),
             enabled: self.profile.gate().enabled(),
             attenuation: self.profile.gate().attenuation(),
         }
@@ -191,15 +204,21 @@ impl MicProfileAdapter {
     pub fn compressor_ipc(&self) -> Compressor {
         Compressor {
             threshold: self.profile.compressor().threshold(),
-            ratio: CompressorRatio::iter()
-                .nth(self.profile.compressor().ratio() as usize)
-                .unwrap(),
-            attack: CompressorAttackTime::iter()
-                .nth(self.profile.compressor().attack() as usize)
-                .unwrap(),
-            release: CompressorReleaseTime::iter()
-                .nth(self.profile.compressor().release() as usize)
-                .unwrap(),
+            ratio: Self::enum_value(
+                CompressorRatio::iter(),
+                self.profile.compressor().ratio() as usize,
+                "compressor ratio",
+            ),
+            attack: Self::enum_value(
+                CompressorAttackTime::iter(),
+                self.profile.compressor().attack() as usize,
+                "compressor attack",
+            ),
+            release: Self::enum_value(
+                CompressorReleaseTime::iter(),
+                self.profile.compressor().release() as usize,
+                "compressor release",
+            ),
             makeup_gain: self.profile.compressor().makeup(),
         }
     }

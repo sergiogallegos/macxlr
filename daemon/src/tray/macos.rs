@@ -101,7 +101,10 @@ unsafe fn stop_ns_application() {
     // First let the NSApplication know it's time to Stop..
     let main_queue = Queue::main();
     main_queue.exec_async(|| {
-        let mtm = MainThreadMarker::new().unwrap();
+        let Some(mtm) = MainThreadMarker::new() else {
+            warn!("Unable to stop NSApplication outside the main thread");
+            return;
+        };
         let app = NSApplication::sharedApplication(mtm);
         app.stop(None);
 
@@ -116,11 +119,13 @@ unsafe fn stop_ns_application() {
             NSEventSubtype::WindowExposed.0,
             0,
             0,
-        ).unwrap();
+        );
 
         // Then we send it to the NSApplication. The application RunLoop only stops after the 'next'
         // event, so we'll force one to ensure shutdown.
-        app.postEvent_atStart(&event, true)
+        if let Some(event) = event {
+            app.postEvent_atStart(&event, true);
+        }
     });
 }
 
@@ -148,7 +153,10 @@ struct AppParams {
 impl App {
     pub fn create(p: AppParams) {
         debug!("Preparing Tray..");
-        let mtm = MainThreadMarker::new().unwrap();
+        let Some(mtm) = MainThreadMarker::new() else {
+            warn!("Unable to create MacOS tray outside the main thread");
+            return;
+        };
 
         // Step 1, create the initial release pool, and base menu..
         unsafe { NSAutoreleasePool::new() };

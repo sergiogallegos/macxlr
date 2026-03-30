@@ -68,7 +68,7 @@ pub async fn spawn_http_server(
         scribble_state: EnumMap::default(),
     }));
 
-    let server = HttpServer::new(move || {
+    let server = match HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin_fn(|origin, _req_head| {
                 origin.as_bytes().starts_with(b"http://127.0.0.1")
@@ -89,21 +89,20 @@ pub async fn spawn_http_server(
             .service(upload_firmware)
             .default_service(web::to(default))
     })
-    .bind((settings.bind_address.clone(), settings.port));
+    .bind((settings.bind_address.clone(), settings.port))
+    {
+        Ok(server) => server.run(),
+        Err(e) => {
+            // Log the Error Message..
+            warn!("Unable to Start HTTP Server: {}", e);
 
-    if let Err(e) = server {
-        // Log the Error Message..
-        warn!("Unable to Start HTTP Server: {}", e);
+            // Let 'Upstream' know an error has occurred
+            let _ = handle_tx.send(Err(anyhow!(e)));
 
-        // Let 'Upstream' know an error has occurred
-        let _ = handle_tx.send(Err(anyhow!(e)));
-
-        // Give up :D
-        return;
-    }
-
-    // Run the server..
-    let server = server.unwrap().run();
+            // Give up :D
+            return;
+        }
+    };
     info!(
         "Started GoXLR configuration interface at http://{}:{}/",
         settings.bind_address.as_str(),
@@ -115,8 +114,8 @@ pub async fn spawn_http_server(
 
     // Wait for the server to exit with its reason
     let result = server.await;
-    if result.is_err() {
-        error!("HTTP Server Stopped with Error: {}", result.err().unwrap());
+    if let Err(error) = result {
+        error!("HTTP Server Stopped with Error: {}", error);
         return;
     }
 
@@ -458,7 +457,13 @@ async fn get_sample(sample: web::Path<String>, app_data: Data<RwLock<AppData>>) 
         let mime_type = MimeGuess::from_path(path.clone()).first_or_octet_stream();
         let mut builder = HttpResponse::Ok();
         builder.insert_header(ContentType(mime_type));
-        return builder.body(fs::read(path).unwrap());
+        return match fs::read(path) {
+            Ok(data) => builder.body(data),
+            Err(error) => {
+                warn!("Unable to read sample for HTTP response: {}", error);
+                HttpResponse::InternalServerError().finish()
+            }
+        };
     }
 
     HttpResponse::NotFound().finish()
@@ -519,7 +524,13 @@ async fn upload_firmware(
         .await;
     let result = rx.await;
     match result {
-        Ok(_) => HttpResponse::Ok().body(serde_json::to_string(&DaemonResponse::Ok).unwrap()),
+        Ok(_) => match serde_json::to_string(&DaemonResponse::Ok) {
+            Ok(body) => HttpResponse::Ok().body(body),
+            Err(error) => {
+                warn!("Unable to serialize HTTP OK response: {}", error);
+                HttpResponse::InternalServerError().finish()
+            }
+        },
         Err(e) => HttpResponse::InternalServerError().body(format!("Error Occurred: {e}")),
     }
 }

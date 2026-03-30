@@ -162,10 +162,21 @@ pub async fn spawn_usb_handler(
                             };
 
                             // Only create this if the serial is present..
-                            if devices.contains_key(&serial) {
-                                // Get the current status..
-                                let state = devices_firmware.get_mut(&serial).unwrap();
-                                state.status = status;
+                            if let Some(device) = devices.get_mut(&serial) {
+                                devices_firmware.insert(serial.clone(), FirmwareUpdateState {
+                                    settings: FirmwareUpdateSettings {
+                                        sender: firmware_update_sender.clone(),
+                                        device: FirmwareUpdateDevice {
+                                            source: settings.get_firmware_source().await,
+                                            serial: serial.clone(),
+                                            device_type: device.get_hardware_type(),
+                                            current_firmware: device.get_firmware_version(),
+                                        },
+                                        file: None,
+                                        force: false,
+                                    },
+                                    status,
+                                });
 
                                 change_found = true;
                             }
@@ -277,7 +288,7 @@ pub async fn spawn_usb_handler(
                     let updated = device.update_state().await;
 
                     if let Ok(result) = updated {
-                        change_found = result;
+                        change_found |= result;
                     }
 
                     if let Err(error) = updated {
@@ -295,15 +306,17 @@ pub async fn spawn_usb_handler(
             Some(serial) = disconnect_receiver.recv() => {
                 info!("[{}] Device Disconnected", serial);
                 devices.remove(&serial);
+                detection_sleep.as_mut().reset(tokio::time::Instant::now());
 
                 // If this device was actively doing a firmware update that's not complete, we should scream
                 // INCREDIBLY loudly (in the logs).. We will keep this device around though, the error will
                 // be handled by the firmware updater, and presented accordingly.
                 if devices_firmware.contains_key(&serial) {
-                    let state = devices_firmware.get(&serial).unwrap();
-                    match state.status.state {
-                        UpdateState::Failed | UpdateState::Pause(_) | UpdateState::Complete => info!("Restarting device after firmware update"),
-                        _ => warn!("DEVICE REMOVED BEFORE UPDATE COMPLETE")
+                    if let Some(state) = devices_firmware.get(&serial) {
+                        match state.status.state {
+                            UpdateState::Failed | UpdateState::Pause(_) | UpdateState::Complete => info!("Restarting device after firmware update"),
+                            _ => warn!("DEVICE REMOVED BEFORE UPDATE COMPLETE")
+                        }
                     }
                 }
                 change_found = true;
@@ -312,7 +325,7 @@ pub async fn spawn_usb_handler(
                 if let Some(device) = devices.get_mut(&serial) {
                     let result = device.monitor_inputs().await;
                     if let Ok(changed) = result {
-                        change_found = changed;
+                        change_found |= changed;
                     }
 
                     if let Err(error) = result {
@@ -356,6 +369,7 @@ pub async fn spawn_usb_handler(
                         // We'll set this regardless and refresh the Status object, this
                         // allows the UI to update when waking up.
                         change_found = true;
+                        detection_sleep.as_mut().reset(tokio::time::Instant::now());
                     }
                 }
 
@@ -635,14 +649,18 @@ pub async fn spawn_usb_handler(
             .await;
 
             // Convert them to JSON..
-            let json_old = serde_json::to_value(&daemon_status).unwrap();
-            let json_new = serde_json::to_value(&new_status).unwrap();
+            let json_old = serde_json::to_value(&daemon_status);
+            let json_new = serde_json::to_value(&new_status);
 
-            let patch = diff(&json_old, &json_new);
+            if let (Ok(json_old), Ok(json_new)) = (json_old, json_new) {
+                let patch = diff(&json_old, &json_new);
 
-            // Only send a patch if something has changed..
-            if !patch.0.is_empty() {
-                let _ = broadcast_tx.send(PatchEvent { data: patch });
+                // Only send a patch if something has changed..
+                if !patch.0.is_empty() {
+                    let _ = broadcast_tx.send(PatchEvent { data: patch });
+                }
+            } else {
+                warn!("Unable to serialize daemon status for patch generation");
             }
 
             // Send the patch to the tokio broadcaster, for handling by clients..

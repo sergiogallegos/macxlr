@@ -12,15 +12,18 @@ use std::path::Path;
 use std::{env, fs};
 
 const PLIST: &[u8] = include_bytes!("../../resources/goxlr-utility.plist.xml");
-const PLIST_FILENAME: &str = "com.github.goxlr-on-linux.goxlr-utility.plist";
+const PLIST_FILENAME: &str = "com.sergiogallegos.macxlr.plist";
 
 pub fn display_error(message: String) {
-    let mtm = MainThreadMarker::new().unwrap();
+    let Some(mtm) = MainThreadMarker::new() else {
+        eprintln!("MacXLR Error: {message}");
+        return;
+    };
 
     unsafe {
         let alert = NSAlert::new(mtm);
         alert.setIcon(get_icon().as_deref());
-        alert.setMessageText(&NSString::from_str("GoXLR Utility"));
+        alert.setMessageText(&NSString::from_str("MacXLR"));
         alert.setInformativeText(&NSString::from_str(&message));
         alert.setAlertStyle(NSAlertStyle::Critical);
 
@@ -54,10 +57,8 @@ pub fn has_autostart() -> bool {
 
 pub fn set_autostart(enabled: bool) -> Result<()> {
     if let Ok(path) = env::var("HOME") {
-        let path = Path::new(&path)
-            .join("Library")
-            .join("LaunchAgents")
-            .join(PLIST_FILENAME);
+        let launch_agents = Path::new(&path).join("Library").join("LaunchAgents");
+        let path = launch_agents.join(PLIST_FILENAME);
 
         if path.exists() && !enabled {
             return fs::remove_file(path).map_err(anyhow::Error::from);
@@ -73,6 +74,7 @@ pub fn set_autostart(enabled: bool) -> Result<()> {
         let plist = String::from_utf8(Vec::from(PLIST))?;
         let built = plist.replace("{{BINARY_PATH}}", &executable.to_string_lossy());
 
+        fs::create_dir_all(&launch_agents)?;
         fs::write(path, built).map_err(anyhow::Error::from)
     } else {
         bail!("Unable to Locate HOME Path");

@@ -23,6 +23,7 @@ pub struct AudioHandler {
     output_device: Option<String>,
 
     buffered_input: Option<Arc<BufferedRecorder>>,
+    recorder_buffer: u16,
 
     last_device_check: Option<Instant>,
     active_streams: EnumMap<SampleBank, EnumMap<SampleButtons, Option<StateManager>>>,
@@ -102,12 +103,26 @@ impl AudioRecordingState {
 }
 
 impl AudioHandler {
+    fn compile_patterns(patterns: &[&str], context: &str) -> Vec<Regex> {
+        patterns
+            .iter()
+            .filter_map(|pattern| match Regex::new(pattern) {
+                Ok(regex) => Some(regex),
+                Err(error) => {
+                    error!("Invalid regex in {}: {} ({})", context, pattern, error);
+                    None
+                }
+            })
+            .collect()
+    }
+
     pub fn new(recorder_buffer: u16) -> Result<Self> {
         // Find the Input Device..
         let mut handler = Self {
             output_device: None,
 
             buffered_input: None,
+            recorder_buffer,
 
             last_device_check: None,
             active_streams: EnumMap::default(),
@@ -134,6 +149,8 @@ impl AudioHandler {
     }
 
     pub fn update_record_buffer(&mut self, recorder_buffer: u16) -> Result<()> {
+        self.recorder_buffer = recorder_buffer;
+
         if let Some(recorder) = &self.buffered_input {
             recorder.stop();
         }
@@ -153,46 +170,76 @@ impl AudioHandler {
         Ok(())
     }
 
+    fn refresh_input_recorder(&mut self) -> Result<()> {
+        self.update_record_buffer(self.recorder_buffer)
+    }
+
     fn get_output_device_patterns(&self) -> Vec<Regex> {
-        let override_output = OVERRIDE_SAMPLER_OUTPUT.lock().unwrap().deref().clone();
+        let override_output = OVERRIDE_SAMPLER_OUTPUT
+            .lock()
+            .map(|value| value.deref().clone())
+            .unwrap_or_else(|error| {
+                warn!("Unable to read sampler output override: {}", error);
+                None
+            });
         if let Some(device) = override_output {
-            return vec![Regex::new(&device).expect("Invalid Regex in Audio Handler")];
+            return Self::compile_patterns(&[device.as_str()], "sampler output override");
         }
 
-        let patterns = vec![
+        Self::compile_patterns(
+            &[
             // Linux
-            Regex::new("goxlr_sample").expect("Invalid Regex in Audio Handler"),
-            Regex::new("GoXLR_0_8_9").expect("Invalid Regex in Audio Handler"),
-            Regex::new("GoXLR.*HiFi__Line3__sink").expect("Invalid Regex in Audio Handler"),
+            "goxlr_sample",
+            "GoXLR_0_8_9",
+            "GoXLR.*HiFi__Line3__sink",
             // MacOS
-            Regex::new("CoreAudio\\*Sample(?:(?!Mini).)*$").expect("Invalid Regex"),
+            "CoreAudio\\*Sample(?:(?!Mini).)*$",
+            "CoreAudio\\*Sampler(?:(?!Mini).)*$",
+            "CoreAudio\\*GoXLR(?:(?!Mini).)*$",
             // Windows
-            Regex::new("^WASAPI\\*Sample(?:(?!Mini).)*$").expect("Invalid Regex in Audio Handler"),
-        ];
-        patterns
+            "^WASAPI\\*Sample(?:(?!Mini).)*$",
+            ],
+            "sampler output patterns",
+        )
     }
 
     fn get_input_device_patterns(&self) -> Vec<Regex> {
-        let override_input = OVERRIDE_SAMPLER_INPUT.lock().unwrap().deref().clone();
+        let override_input = OVERRIDE_SAMPLER_INPUT
+            .lock()
+            .map(|value| value.deref().clone())
+            .unwrap_or_else(|error| {
+                warn!("Unable to read sampler input override: {}", error);
+                None
+            });
         if let Some(device) = override_input {
-            return vec![Regex::new(&device).expect("Invalid Regex in Audio Handler")];
+            return Self::compile_patterns(&[device.as_str()], "sampler input override");
         }
 
-        let patterns = vec![
+        Self::compile_patterns(
+            &[
             // Linux
-            Regex::new("goxlr_sample.*source").expect("Invalid Regex in Audio Handler"),
-            Regex::new("GoXLR_0_4_5.*source").expect("Invalid Regex in Audio Handler"),
-            Regex::new("GoXLR.*HiFi__Line5__source").expect("Invalid Regex in Audio Handler"),
+            "goxlr_sample.*source",
+            "GoXLR_0_4_5.*source",
+            "GoXLR.*HiFi__Line5__source",
             // MacOS
-            Regex::new("CoreAudio\\*Sampler(?:(?!Mini).)*$").expect("Invalid Regex"),
+            "CoreAudio\\*Sampler(?:(?!Mini).)*$",
+            "CoreAudio\\*Sample(?:(?!Mini).)*$",
+            "CoreAudio\\*GoXLR(?:(?!Mini).)*$",
             // Windows
-            Regex::new("^WASAPI\\*Sample(?:(?!Mini).)*$").expect("Invalid Regex in Audio Handler"),
-        ];
-        patterns
+            "^WASAPI\\*Sample(?:(?!Mini).)*$",
+            ],
+            "sampler input patterns",
+        )
     }
 
     fn get_input_device_string_patterns(&self) -> Vec<String> {
-        let override_input = OVERRIDE_SAMPLER_INPUT.lock().unwrap().deref().clone();
+        let override_input = OVERRIDE_SAMPLER_INPUT
+            .lock()
+            .map(|value| value.deref().clone())
+            .unwrap_or_else(|error| {
+                warn!("Unable to read sampler input override: {}", error);
+                None
+            });
         if let Some(device) = override_input {
             return vec![device];
         }
@@ -204,6 +251,8 @@ impl AudioHandler {
             String::from("GoXLR.*HiFi__Line5__source"),
             // MacOS
             String::from("CoreAudio\\*Sampler(?:(?!Mini).)*$"),
+            String::from("CoreAudio\\*Sample(?:(?!Mini).)*$"),
+            String::from("CoreAudio\\*GoXLR(?:(?!Mini).)*$"),
             // Windows
             String::from("^WASAPI\\*Sample(?:(?!Mini).)*$"),
         ];
@@ -229,6 +278,15 @@ impl AudioHandler {
             false => self.get_input_device_patterns(),
         };
 
+        debug!(
+            "Looking for {} device using patterns: {:?}",
+            if is_output { "output" } else { "input" },
+            pattern_matchers
+                .iter()
+                .map(|pattern| pattern.as_str())
+                .collect::<Vec<_>>()
+        );
+
         let device = device_list
             .iter()
             .find(|output| {
@@ -247,6 +305,8 @@ impl AudioHandler {
             warn!("Audio Device Not Found, Available Devices:");
             device_list.iter().for_each(|name| info!("{}", name));
         }
+
+        self.last_device_check = Some(Instant::now());
 
         if is_output {
             self.output_device = device;
@@ -347,43 +407,66 @@ impl AudioHandler {
             self.find_device(true);
         }
 
-        if let Some(output_device) = &self.output_device {
-            // Ok, we need to grab and configure the player..
-            let mut player = Player::new(
+        let build_player = |output_device: &str| {
+            Player::new(
                 &audio.file,
-                Some(output_device.clone()),
+                Some(output_device.to_string()),
                 audio.fade_on_stop,
                 audio.start_pct,
                 audio.stop_pct,
                 audio.gain,
-            )?;
+            )
+        };
 
-            let state = player.get_state();
-            let handler = thread::spawn(move || {
-                if !loop_track {
-                    let result = player.play();
-                    if let Err(error) = result {
-                        warn!("Playback Error: {}", error);
-                    }
-                } else {
-                    let result = player.play_loop();
-                    if let Err(error) = result {
-                        warn!("Loop Playback Error: {}", error);
-                    }
+        let mut player = if let Some(output_device) = &self.output_device {
+            match build_player(output_device) {
+                Ok(player) => player,
+                Err(error) => {
+                    warn!(
+                        "Unable to create player for cached sampler output '{}': {}. Retrying device lookup.",
+                        output_device, error
+                    );
+
+                    self.output_device = None;
+                    self.last_device_check = None;
+                    self.find_device(true);
+
+                    let Some(refreshed_output) = &self.output_device else {
+                        return Err(anyhow!(
+                            "Unable to play Sample, Output device not found after retry"
+                        ));
+                    };
+
+                    build_player(refreshed_output)?
                 }
-            });
-
-            self.active_streams[bank][button] = Some(StateManager {
-                stream_type: StreamType::Playback,
-                recording: None,
-                playback: Some(AudioPlaybackState {
-                    handle: Some(handler),
-                    state,
-                }),
-            });
+            }
         } else {
             return Err(anyhow!("Unable to play Sample, Output device not found"));
-        }
+        };
+
+        let state = player.get_state();
+        let handler = thread::spawn(move || {
+            if !loop_track {
+                let result = player.play();
+                if let Err(error) = result {
+                    warn!("Playback Error: {}", error);
+                }
+            } else {
+                let result = player.play_loop();
+                if let Err(error) = result {
+                    warn!("Loop Playback Error: {}", error);
+                }
+            }
+        });
+
+        self.active_streams[bank][button] = Some(StateManager {
+            stream_type: StreamType::Playback,
+            recording: None,
+            playback: Some(AudioPlaybackState {
+                handle: Some(handler),
+                state,
+            }),
+        });
 
         Ok(())
     }
@@ -461,45 +544,67 @@ impl AudioHandler {
         bank: SampleBank,
         button: SampleButtons,
     ) -> Result<()> {
-        if let Some(recorder) = &self.buffered_input {
-            if !recorder.is_ready() {
-                warn!("Sampler not ready, possibly missing Sample device. Not recording.");
+        let recorder = if let Some(recorder) = &self.buffered_input {
+            if recorder.is_ready() {
+                recorder.clone()
+            } else {
+                warn!("Sampler recorder is not ready, refreshing input device detection.");
+                self.refresh_input_recorder()?;
 
-                debug!("Available Audio Inputs: ");
-                get_audio_inputs()
-                    .iter()
-                    .for_each(|name| debug!("{}", name));
+                let Some(recorder) = &self.buffered_input else {
+                    bail!("No valid Input Device was Found");
+                };
 
-                bail!("Sampler is not ready to handle recording (possibly missing device?)");
-            }
+                if !recorder.is_ready() {
+                    warn!("Sampler not ready, possibly missing Sample device. Not recording.");
+                    debug!("Available Audio Inputs: ");
+                    get_audio_inputs()
+                        .iter()
+                        .for_each(|name| debug!("{}", name));
 
-            let state = RecorderState {
-                stop: Arc::new(AtomicBool::new(false)),
-                gain: Arc::new(AtomicF64::new(1.)),
-            };
-
-            let inner_recorder = recorder.clone();
-            let inner_path = path.clone();
-            let inner_state = state.clone();
-
-            let handler = thread::spawn(move || {
-                let result = inner_recorder.record(&inner_path, inner_state);
-                if result.is_err() {
-                    error!("Error: {}", result.err().unwrap());
+                    bail!("Sampler is not ready to handle recording (possibly missing device?)");
                 }
-            });
 
-            self.active_streams[bank][button] = Some(StateManager {
-                stream_type: StreamType::Recording,
-                recording: Some(AudioRecordingState {
-                    file: path,
-                    handle: Some(handler),
-                    state,
-                }),
-                playback: None,
-            });
+                recorder.clone()
+            }
         } else {
-            bail!("No valid Input Device was Found");
+            self.refresh_input_recorder()?;
+            self.buffered_input
+                .as_ref()
+                .cloned()
+                .ok_or_else(|| anyhow!("No valid Input Device was Found"))?
+        };
+
+        let state = RecorderState {
+            stop: Arc::new(AtomicBool::new(false)),
+            gain: Arc::new(AtomicF64::new(1.)),
+        };
+
+        let inner_recorder = recorder;
+        let inner_path = path.clone();
+        let inner_state = state.clone();
+
+        let handler = thread::spawn(move || {
+            let result = inner_recorder.record(&inner_path, inner_state);
+            if let Err(error) = result {
+                error!("Recording Error: {}", error);
+            }
+        });
+
+        self.active_streams[bank][button] = Some(StateManager {
+            stream_type: StreamType::Recording,
+            recording: Some(AudioRecordingState {
+                file: path,
+                handle: Some(handler),
+                state,
+            }),
+            playback: None,
+        });
+
+        if let Some(recording) = &self.active_streams[bank][button]
+            && recording.recording.is_none()
+        {
+            bail!("Failed to initialise recording state");
         }
 
         Ok(())
@@ -617,11 +722,14 @@ impl AudioHandler {
             // We need to make sure the thread is finished..
             task.player.wait();
 
-            let error = task.player.state.error.lock().unwrap();
-            let task_result = if error.is_some() {
-                Err(anyhow!(error.as_ref().unwrap().clone()))
+            let task_result = if let Ok(error) = task.player.state.error.lock() {
+                if let Some(error) = error.as_ref() {
+                    Err(anyhow!(error.clone()))
+                } else {
+                    Ok(())
+                }
             } else {
-                Ok(())
+                Err(anyhow!("Unable to read calculation state"))
             };
 
             result = CalculationResult {

@@ -468,15 +468,19 @@ impl<'a> Device<'a> {
                     let bank = result.bank;
                     let button = result.button;
 
-                    let filename = result.file.file_name().unwrap();
-                    let filename = filename.to_string_lossy().to_string();
+                    if let Some(filename) = result.file.file_name() {
+                        let filename = filename.to_string_lossy().to_string();
 
-                    debug!("Calculated Gain: {}", result.gain);
+                        debug!("Calculated Gain: {}", result.gain);
 
-                    let track = self.profile.add_sample_file(bank, button, filename);
-                    track.normalized_gain = result.gain;
+                        let track = self.profile.add_sample_file(bank, button, filename);
+                        track.normalized_gain = result.gain;
 
-                    refresh_colour_map = true;
+                        refresh_colour_map = true;
+                    } else {
+                        self.last_sample_error =
+                            Some("Calculated sample file had no filename".to_string());
+                    }
                 }
                 state_updated = true;
             }
@@ -793,9 +797,9 @@ impl<'a> Device<'a> {
             return Ok(());
         }
 
-        // We know these both exist, so the unwrap is safe
-        let first = self.tap_tempo.front().unwrap();
-        let last = self.tap_tempo.back().unwrap();
+        let (Some(first), Some(last)) = (self.tap_tempo.front(), self.tap_tempo.back()) else {
+            return Ok(());
+        };
 
         let avg_ms = (*last - *first) / ((self.tap_tempo.len() - 1) as u32);
         let bpm = (60_000.0 / avg_ms.as_millis() as f64).clamp(45., 300.) as u16;
@@ -1292,7 +1296,9 @@ impl<'a> Device<'a> {
             SamplePlaybackMode::PlayStop
             | SamplePlaybackMode::PlayFade
             | SamplePlaybackMode::Loop => {
-                let audio_handler = self.audio_handler.as_mut().unwrap();
+                let Some(audio_handler) = self.audio_handler.as_mut() else {
+                    bail!("Audio handler not configured for sampler playback");
+                };
                 // In these cases, we may be required to stop playback.
                 if audio_handler.is_sample_playing(sample_bank, button)
                     && !audio_handler.is_sample_stopping(sample_bank, button)
@@ -1398,17 +1404,11 @@ impl<'a> Device<'a> {
 
         let sample_bank = self.profile.get_active_sample_bank();
         if !self.profile.current_sample_bank_has_samples(button) {
-            if self
-                .audio_handler
-                .as_mut()
-                .unwrap()
-                .sample_recording(sample_bank, button)
-            {
-                let file_name = self
-                    .audio_handler
-                    .as_mut()
-                    .unwrap()
-                    .stop_record(sample_bank, button)?;
+            let Some(audio_handler) = self.audio_handler.as_mut() else {
+                bail!("Audio handler not configured for sampler recording");
+            };
+            if audio_handler.sample_recording(sample_bank, button) {
+                let file_name = audio_handler.stop_record(sample_bank, button)?;
 
                 if let Some((file_name, gain)) = file_name {
                     let track = self.profile.add_sample_file(sample_bank, button, file_name);
@@ -1425,11 +1425,11 @@ impl<'a> Device<'a> {
         let mode = self.profile.get_sample_playback_mode(button);
         match mode {
             SamplePlaybackMode::StopOnRelease | SamplePlaybackMode::FadeOnRelease => {
-                self.audio_handler
-                    .as_mut()
-                    .unwrap()
-                    .stop_playback(sample_bank, button, false)
-                    .await?;
+                if let Some(audio_handler) = self.audio_handler.as_mut() {
+                    audio_handler
+                        .stop_playback(sample_bank, button, false)
+                        .await?;
+                }
                 return Ok(());
             }
             _ => {}
@@ -1476,10 +1476,17 @@ impl<'a> Device<'a> {
                 .play_for_button(bank, button, audio, loop_track)
                 .await;
 
-            if result.is_ok() {
-                self.profile.set_sample_button_state(button, true);
-            } else {
-                error!("{}", result.err().unwrap());
+            match result {
+                Ok(()) => {
+                    self.last_sample_error = None;
+                    self.profile.set_sample_button_state(button, true);
+                }
+                Err(error) => {
+                    let error = anyhow!(error.to_string());
+                    self.last_sample_error = Some(error.to_string());
+                    error!("{}", error);
+                    return Err(error);
+                }
             }
         }
         Ok(())
@@ -1507,8 +1514,15 @@ impl<'a> Device<'a> {
 
         if let Some(audio_handler) = &mut self.audio_handler {
             let result = audio_handler.record_for_button(sample_path, sample_bank, button);
-            if result.is_ok() {
-                self.profile.set_sample_button_blink(button, true);
+            match result {
+                Ok(()) => {
+                    self.last_sample_error = None;
+                    self.profile.set_sample_button_blink(button, true);
+                }
+                Err(error) => {
+                    self.last_sample_error = Some(error.to_string());
+                    return Err(error);
+                }
             }
         }
 
@@ -1531,11 +1545,10 @@ impl<'a> Device<'a> {
 
         let mut changed = false;
         for button in SampleButtons::iter() {
-            let playing = self
-                .audio_handler
-                .as_ref()
-                .unwrap()
-                .is_sample_playing(self.profile.get_active_sample_bank(), button);
+            let Some(audio_handler) = self.audio_handler.as_ref() else {
+                return Ok(false);
+            };
+            let playing = audio_handler.is_sample_playing(self.profile.get_active_sample_bank(), button);
 
             if self.profile.is_sample_active(button) && !playing {
                 self.profile.set_sample_button_state(button, false);
@@ -3550,8 +3563,9 @@ impl<'a> Device<'a> {
             return Ok(());
         }
 
-        // This will always be set here..
-        let fader_to_switch = fader_to_switch.unwrap();
+        let Some(fader_to_switch) = fader_to_switch else {
+            bail!("Unable to determine fader to switch");
+        };
 
         // So we need to switch the faders and mute settings, but nothing else actually changes,
         // we'll simply switch the faders and mute buttons in the config, then apply to the

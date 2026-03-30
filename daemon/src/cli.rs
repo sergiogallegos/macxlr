@@ -51,10 +51,11 @@ pub struct Cli {
 }
 
 fn default_config_location() -> PathBuf {
-    let proj_dirs = ProjectDirs::from("org", "GoXLR-on-Linux", "GoXLR-Utility")
-        .expect("Couldn't find project directory");
-
-    proj_dirs.config_dir().join("settings.json")
+    if let Some(proj_dirs) = ProjectDirs::from("com", "sergiogallegos", "MacXLR") {
+        proj_dirs.config_dir().join("settings.json")
+    } else {
+        PathBuf::from("settings.json")
+    }
 }
 
 #[repr(usize)]

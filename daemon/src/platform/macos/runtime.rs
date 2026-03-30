@@ -27,15 +27,27 @@ use tokio::{select, time};
 */
 pub async fn run(tx: mpsc::Sender<EventTriggers>, mut stop: Shutdown) -> Result<()> {
     // Before we start, we should destroy any existing aggregate devices as they're unmanaged.
-    if let Ok(devices) = find_all_existing_aggregates() {
-        for device in devices {
-            if destroy_aggregate_device(device).is_err() {
-                warn!("Unable to Destroy Aggregate Device {}", device);
+    match find_all_existing_aggregates() {
+        Ok(devices) => {
+            if devices.is_empty() {
+                debug!("No existing GoXLR aggregate devices found at startup");
+            }
+            for device in devices {
+                if destroy_aggregate_device(device).is_err() {
+                    warn!("Unable to Destroy Aggregate Device {}", device);
+                }
             }
         }
+        Err(error) => warn!("Unable to enumerate existing aggregate devices: {}", error),
     }
 
-    if !HANDLE_MACOS_AGGREGATES.lock().unwrap().unwrap() {
+    let aggregates_enabled = HANDLE_MACOS_AGGREGATES
+        .lock()
+        .ok()
+        .and_then(|guard| *guard)
+        .unwrap_or(true);
+    if !aggregates_enabled {
+        debug!("MacOS aggregate management disabled in settings");
         return Ok(());
     }
 
@@ -52,14 +64,20 @@ pub async fn run(tx: mpsc::Sender<EventTriggers>, mut stop: Shutdown) -> Result<
     loop {
         select! {
             _ = ticker.tick() => {
-                if let Ok(devices) = get_goxlr_devices() {
+                match get_goxlr_devices() {
+                    Ok(devices) => {
+                    if devices.is_empty() {
+                        debug!("No GoXLR CoreAudio devices detected on this poll");
+                    }
                     // Iterate the device map to check for things..
                     for uid in device_map.keys() {
                         // Is this device still present?
                         if !devices.iter().any(|d| d.uid == *uid) {
                             debug!("{} No longer Present in Map..", uid);
-                            if destroy_devices(device_map.get(uid).unwrap()).is_err() {
-                                warn!("Error Removing Aggregate Devices");
+                            if let Some(devices) = device_map.get(uid) {
+                                if let Err(error) = destroy_devices(devices) {
+                                    warn!("Error Removing Aggregate Devices: {}", error);
+                                }
                             }
                             remove_keys.push(uid.clone());
                         }
@@ -82,6 +100,8 @@ pub async fn run(tx: mpsc::Sender<EventTriggers>, mut stop: Shutdown) -> Result<
                             }
                         }
                     }
+                    }
+                    Err(error) => warn!("Error polling GoXLR CoreAudio devices: {}", error),
                 }
             },
 
@@ -118,19 +138,23 @@ fn create_devices(device: CoreAudioDevice) -> Result<Vec<AudioDeviceID>> {
 
     // Create the Aggregates for the Outputs..
     for output in Outputs::iter() {
-        let aggregate = create_aggregate_device(output.get_name(), &device)?;
+        let name = output.get_name();
+        let aggregate = create_aggregate_device(name.clone(), &device)?;
 
         add_sub_device(aggregate, device.uid.clone())?;
         set_active_channels(aggregate, false, output.get_channels())?;
+        debug!("Created output aggregate '{}' with id {}", name, aggregate);
 
         devices.push(aggregate);
     }
 
     // Create the Aggregates for the Inputs..
     for input in Inputs::iter() {
-        let aggregate = create_aggregate_device(input.get_name(), &device)?;
+        let name = input.get_name();
+        let aggregate = create_aggregate_device(name.clone(), &device)?;
         add_sub_device(aggregate, device.uid.clone())?;
         set_active_channels(aggregate, true, input.get_channels())?;
+        debug!("Created input aggregate '{}' with id {}", name, aggregate);
 
         devices.push(aggregate);
     }

@@ -22,7 +22,7 @@ edition = "2024"
 authors = ["Nathan Adams <dinnerbone@dinnerbone.com>", "Craig McLure <craig@mclure.net>", "Lars Mühlbauer <lm41@dismail.de>"]
 license = "MIT"
 
-repository = "https://github.com/GoXLR-on-Linux/GoXLR-Utility"
+repository = "https://github.com/sergiogallegos/macxlr"
 
 [workspace.dependencies]
 log = "0.4.28"

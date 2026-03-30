@@ -47,9 +47,30 @@ impl AsRef<Path> for Paths {
 }
 
 impl SettingsHandle {
+    fn device_settings<'a>(
+        settings: &'a Settings,
+        device_serial: &str,
+    ) -> Option<&'a DeviceSettings> {
+        settings
+            .devices
+            .as_ref()
+            .and_then(|devices| devices.get(device_serial))
+    }
+
+    fn device_settings_mut<'a>(
+        settings: &'a mut Settings,
+        device_serial: &str,
+    ) -> &'a mut DeviceSettings {
+        settings
+            .devices
+            .get_or_insert_with(Default::default)
+            .entry(device_serial.to_owned())
+            .or_insert_with(DeviceSettings::default)
+    }
+
     pub async fn load(path: PathBuf) -> Result<SettingsHandle> {
         // This is only used for defaults
-        let proj_dirs = ProjectDirs::from("org", "GoXLR-on-Linux", "GoXLR-Utility")
+        let proj_dirs = ProjectDirs::from("com", "sergiogallegos", "MacXLR")
             .context("Couldn't find project directories")?;
         let data_dir = proj_dirs.data_dir();
 
@@ -180,7 +201,7 @@ impl SettingsHandle {
 
     pub async fn get_show_tray_icon(&self) -> bool {
         let settings = self.settings.read().await;
-        settings.show_tray_icon.unwrap()
+        settings.show_tray_icon.unwrap_or(true)
     }
 
     pub async fn set_show_tray_icon(&self, enabled: bool) {
@@ -190,7 +211,7 @@ impl SettingsHandle {
 
     pub async fn get_firmware_source(&self) -> FirmwareSource {
         let settings = self.settings.read().await;
-        settings.firmware_source.unwrap()
+        settings.firmware_source.unwrap_or_default()
     }
 
     pub async fn set_firmware_source(&self, source: FirmwareSource) {
@@ -213,7 +234,7 @@ impl SettingsHandle {
         #[cfg(feature = "tts")]
         {
             let settings = self.settings.read().await;
-            return Some(settings.tts_enabled.unwrap());
+            return Some(settings.tts_enabled.unwrap_or(false));
         }
 
         // Because whether we get here is defined by a feature, clippy can't be completely
@@ -229,7 +250,7 @@ impl SettingsHandle {
 
     pub async fn get_allow_network_access(&self) -> bool {
         let settings = self.settings.read().await;
-        settings.allow_network_access.unwrap()
+        settings.allow_network_access.unwrap_or(false)
     }
 
     pub async fn set_allow_network_access(&self, enabled: bool) {
@@ -244,7 +265,7 @@ impl SettingsHandle {
 
     pub async fn get_macos_handle_aggregates(&self) -> bool {
         let settings = self.settings.read().await;
-        settings.macos_handle_aggregates.unwrap()
+        settings.macos_handle_aggregates.unwrap_or(true)
     }
 
     pub async fn get_profile_directory(&self) -> PathBuf {
@@ -342,32 +363,17 @@ impl SettingsHandle {
 
     pub async fn get_device_profile_name(&self, device_serial: &str) -> Option<String> {
         let settings = self.settings.read().await;
-        settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
-            .map(|d| d.profile.clone())
+        Self::device_settings(&settings, device_serial).map(|d| d.profile.clone())
     }
 
     pub async fn get_device_mic_profile_name(&self, device_serial: &str) -> Option<String> {
         let settings = self.settings.read().await;
-        settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
-            .map(|d| d.mic_profile.clone())
+        Self::device_settings(&settings, device_serial).map(|d| d.mic_profile.clone())
     }
 
     pub async fn get_device_shutdown_commands(&self, device_serial: &str) -> Vec<GoXLRCommand> {
         let settings = self.settings.read().await;
-        let value = settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
-            .map(|d| d.shutdown_commands.clone());
+        let value = Self::device_settings(&settings, device_serial).map(|d| d.shutdown_commands.clone());
 
         if let Some(value) = value {
             return value;
@@ -377,12 +383,7 @@ impl SettingsHandle {
 
     pub async fn get_device_sleep_commands(&self, device_serial: &str) -> Vec<GoXLRCommand> {
         let settings = self.settings.read().await;
-        let value = settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
-            .map(|d| d.sleep_commands.clone());
+        let value = Self::device_settings(&settings, device_serial).map(|d| d.sleep_commands.clone());
 
         if let Some(value) = value {
             return value;
@@ -392,12 +393,7 @@ impl SettingsHandle {
 
     pub async fn get_device_wake_commands(&self, device_serial: &str) -> Vec<GoXLRCommand> {
         let settings = self.settings.read().await;
-        let value = settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
-            .map(|d| d.wake_commands.clone());
+        let value = Self::device_settings(&settings, device_serial).map(|d| d.wake_commands.clone());
 
         if let Some(value) = value {
             return value;
@@ -407,11 +403,7 @@ impl SettingsHandle {
 
     pub async fn get_device_sampler_pre_buffer(&self, device_serial: &str) -> u16 {
         let settings = self.settings.read().await;
-        let value = settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
+        let value = Self::device_settings(&settings, device_serial)
             .map(|d| d.sampler_pre_buffer.unwrap_or(0));
         if let Some(value) = value {
             return value;
@@ -421,11 +413,7 @@ impl SettingsHandle {
 
     pub async fn get_device_hold_time(&self, device_serial: &str) -> u16 {
         let settings = self.settings.read().await;
-        let value = settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
+        let value = Self::device_settings(&settings, device_serial)
             .map(|d| d.hold_delay.unwrap_or(500));
 
         if let Some(value) = value {
@@ -437,11 +425,7 @@ impl SettingsHandle {
     // I absolutely hate this naming.. O_O
     pub async fn get_device_chat_mute_mutes_mic_to_chat(&self, device_serial: &str) -> bool {
         let settings = self.settings.read().await;
-        let value = settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
+        let value = Self::device_settings(&settings, device_serial)
             .map(|d| d.chat_mute_mutes_mic_to_chat.unwrap_or(true));
 
         if let Some(value) = value {
@@ -452,11 +436,7 @@ impl SettingsHandle {
 
     pub async fn get_device_lock_faders(&self, device_serial: &str) -> bool {
         let settings = self.settings.read().await;
-        let value = settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
+        let value = Self::device_settings(&settings, device_serial)
             .map(|d| d.lock_faders.unwrap_or(true));
 
         if let Some(value) = value {
@@ -467,11 +447,7 @@ impl SettingsHandle {
 
     pub async fn get_enable_monitor_with_fx(&self, device_serial: &str) -> bool {
         let settings = self.settings.read().await;
-        let value = settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
+        let value = Self::device_settings(&settings, device_serial)
             .map(|d| d.enable_monitor_with_fx.unwrap_or(false));
         if let Some(value) = value {
             return value;
@@ -481,11 +457,7 @@ impl SettingsHandle {
 
     pub async fn get_device_vod_mode(&self, device_serial: &str) -> VodMode {
         let settings = self.settings.read().await;
-        let value = settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
+        let value = Self::device_settings(&settings, device_serial)
             .map(|d| d.vod_mode.unwrap_or(Routable));
 
         if let Some(value) = value {
@@ -496,22 +468,14 @@ impl SettingsHandle {
 
     pub async fn get_sampler_reset_on_clear(&self, device_serial: &str) -> bool {
         let settings = self.settings.read().await;
-        settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
+        Self::device_settings(&settings, device_serial)
             .map(|d| d.sampler_reset_on_clear.unwrap_or(true))
             .unwrap_or(true)
     }
 
     pub async fn get_sampler_fade_duration(&self, device_serial: &str) -> u32 {
         let settings = self.settings.read().await;
-        settings
-            .devices
-            .as_ref()
-            .unwrap()
-            .get(device_serial)
+        Self::device_settings(&settings, device_serial)
             .map(|d| d.sampler_fade_duration.unwrap_or(500))
             .unwrap_or(500)
     }
@@ -539,23 +503,13 @@ impl SettingsHandle {
 
     pub async fn set_device_profile_name(&self, device_serial: &str, profile_name: &str) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         profile_name.clone_into(&mut entry.profile);
     }
 
     pub async fn set_device_mic_profile_name(&self, device_serial: &str, mic_profile_name: &str) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         mic_profile_name.clone_into(&mut entry.mic_profile);
     }
 
@@ -565,12 +519,7 @@ impl SettingsHandle {
         commands: Vec<GoXLRCommand>,
     ) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         commands.clone_into(&mut entry.shutdown_commands);
     }
 
@@ -580,112 +529,62 @@ impl SettingsHandle {
         commands: Vec<GoXLRCommand>,
     ) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         commands.clone_into(&mut entry.sleep_commands);
     }
 
     pub async fn set_device_wake_commands(&self, device_serial: &str, commands: Vec<GoXLRCommand>) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         commands.clone_into(&mut entry.wake_commands);
     }
 
     pub async fn set_device_sampler_pre_buffer(&self, device_serial: &str, duration: u16) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         entry.sampler_pre_buffer = Some(duration);
     }
 
     pub async fn set_device_mute_hold_duration(&self, device_serial: &str, duration: u16) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         entry.hold_delay = Some(duration);
     }
 
     pub async fn set_device_vc_mute_also_mute_cm(&self, device_serial: &str, setting: bool) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         entry.chat_mute_mutes_mic_to_chat = Some(setting);
     }
 
     pub async fn set_device_lock_faders(&self, device_serial: &str, setting: bool) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         entry.lock_faders = Some(setting);
     }
 
     pub async fn set_enable_monitor_with_fx(&self, device_serial: &str, setting: bool) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         entry.enable_monitor_with_fx = Some(setting);
     }
 
     pub async fn set_device_vod_mode(&self, device_serial: &str, setting: VodMode) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         entry.vod_mode = Some(setting);
     }
 
     pub async fn set_sampler_reset_on_clear(&self, device_serial: &str, setting: bool) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         entry.sampler_reset_on_clear = Some(setting);
     }
 
     #[allow(dead_code)]
     pub async fn set_sampler_fade_duration(&self, device_serial: &str, duration: u32) {
         let mut settings = self.settings.write().await;
-        let entry = settings
-            .devices
-            .as_mut()
-            .unwrap()
-            .entry(device_serial.to_owned())
-            .or_insert_with(DeviceSettings::default);
+        let entry = Self::device_settings_mut(&mut settings, device_serial);
         entry.sampler_fade_duration = Some(duration);
     }
 
@@ -695,7 +594,10 @@ impl SettingsHandle {
             settings.sample_gain.replace(HashMap::default());
         }
 
-        let entry = settings.sample_gain.as_mut().unwrap().entry(name);
+        let entry = settings
+            .sample_gain
+            .get_or_insert_with(Default::default)
+            .entry(name);
         entry.and_modify(|v| *v = value).or_insert(value);
     }
 }

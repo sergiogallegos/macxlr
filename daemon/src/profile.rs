@@ -78,7 +78,7 @@ impl ProfileAdapter {
             DEFAULT_PROFILE_NAME.to_string(),
             Cursor::new(DEFAULT_PROFILE),
         )
-        .expect("Default profile isn't available")
+        .unwrap_or_else(|error| panic!("Default profile isn't available: {}", error))
     }
 
     pub fn from_reader<R: Read + Seek>(name: String, reader: R) -> Result<Self> {
@@ -993,9 +993,8 @@ impl ProfileAdapter {
         let mute_config = self.get_mute_button(fader);
         let colour_map = mute_config.colour_map();
 
-        // We should be safe to straight unwrap these, state and blink are always present.
-        let muted_to_x = colour_map.state().as_ref().unwrap() == &ColourState::On;
-        let muted_to_all = colour_map.blink().as_ref().unwrap() == &ColourState::On;
+        let muted_to_x = colour_map.state().as_ref() == Some(&ColourState::On);
+        let muted_to_all = colour_map.blink().as_ref() == Some(&ColourState::On);
         let mute_function = *mute_config.mute_function();
 
         (muted_to_x, muted_to_all, mute_function)
@@ -1615,8 +1614,11 @@ impl ProfileAdapter {
     }
 
     pub fn get_active_hardtune_source(&self) -> InputDevice {
-        let source = self.get_active_hardtune_profile().source();
-        match source.unwrap() {
+        let source = self
+            .get_active_hardtune_profile()
+            .source()
+            .unwrap_or(HardTuneSource::All);
+        match source {
             HardTuneSource::Music => InputDevice::Music,
             HardTuneSource::Game => InputDevice::Game,
             HardTuneSource::LineIn => InputDevice::LineIn,

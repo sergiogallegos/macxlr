@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow, bail};
 
 use core::default::Default;
 use ebur128::{EbuR128, Mode};
-use log::debug;
+use log::{debug, error};
 use std::fs::File;
 use std::io::ErrorKind::UnexpectedEof;
 use std::path::PathBuf;
@@ -53,15 +53,14 @@ impl Player {
         stop_pct: Option<f64>,
         gain: Option<f64>,
     ) -> Result<Self> {
-        let probe_result = Player::load_file(file);
-        if probe_result.is_err() {
-            return Err(anyhow!("Unable to Probe Audio File"));
-        }
+        let probe = Player::load_file(file).map_err(|error| {
+            anyhow!("Unable to probe audio file {}: {}", file.display(), error)
+        })?;
 
         Ok(Self {
             file: file.clone(),
 
-            probe: probe_result.unwrap(),
+            probe,
             volume: 1.0_f32,
             stopping: Arc::new(AtomicBool::new(false)),
             force_stop: Arc::new(AtomicBool::new(false)),
@@ -90,7 +89,7 @@ impl Player {
             hint.with_extension(extension_str);
         }
 
-        let media_source = Box::new(File::open(file).unwrap());
+        let media_source = Box::new(File::open(file)?);
         let stream = MediaSourceStream::new(media_source, Default::default());
 
         let format_options = Default::default();
@@ -104,8 +103,12 @@ impl Player {
 
         let result = self.play();
         if let Err(error) = result {
-            let mut res = self.error.lock().unwrap();
-            *res = Some(error.to_string());
+            match self.error.lock() {
+                Ok(mut res) => *res = Some(error.to_string()),
+                Err(lock_error) => {
+                    error!("Unable to store playback error state: {}", lock_error);
+                }
+            }
         }
     }
 
@@ -115,11 +118,7 @@ impl Player {
             self.play()?;
 
             // Reload the file for next play..
-            let probe = Player::load_file(&self.file);
-            if probe.is_err() {
-                bail!(probe.err().unwrap());
-            }
-            self.probe = probe.unwrap();
+            self.probe = Player::load_file(&self.file)?;
         }
         Ok(())
     }
@@ -180,17 +179,14 @@ impl Player {
                     if let Some(start_pct) = self.start_pct {
                         // Calculate the first frame based on the percent..
                         first_frame = Some(((frames as f64 / 100.0) * start_pct).round() as u64);
-                        debug!(
-                            "Starting Sample: {}",
-                            first_frame.unwrap() * channels as u64
-                        );
+                        debug!("Starting Sample: {}", first_frame.unwrap_or_default() * channels as u64);
                     }
 
                     if let Some(stop_pct) = self.stop_pct {
                         stop_sample = Some(
                             ((frames as f64 / 100.0) * stop_pct).round() as u64 * channels as u64,
                         );
-                        debug!("Stop Sample: {}", stop_sample.unwrap());
+                        debug!("Stop Sample: {}", stop_sample.unwrap_or_default());
                     }
                 }
             }
@@ -331,7 +327,7 @@ impl Player {
 
                         // Flush the samples to the Audio Stream..
                         if let Some(audio_output) = &mut audio_output {
-                            audio_output.write(&samples).unwrap()
+                            audio_output.write(&samples)?
                         }
 
                         samples_processed += samples.len() as u64;

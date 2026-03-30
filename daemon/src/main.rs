@@ -112,7 +112,7 @@ async fn main() -> Result<()> {
         }
 
         // Message is Cross-Platform now :)
-        let message = format!("Error Starting the GoXLR Utility:\r\n\r\n{e}");
+        let message = format!("Error Starting MacXLR:\r\n\r\n{e}");
         platform::display_error(message);
 
         // Kill the process with an error to ensure the entire runtime is stopped
@@ -130,7 +130,9 @@ async fn run_utility() -> Result<()> {
 
     // Set the MacOS Aggregate management..
     let aggregates = settings.get_macos_handle_aggregates().await;
-    HANDLE_MACOS_AGGREGATES.lock().unwrap().replace(aggregates);
+    if let Ok(mut handle) = HANDLE_MACOS_AGGREGATES.lock() {
+        handle.replace(aggregates);
+    }
 
     // Configure and / or create the log path, and file name.
     let log_path = settings.get_log_directory().await;
@@ -212,16 +214,21 @@ async fn run_utility() -> Result<()> {
     }
 
     if cfg!(target_os = "macos") {
+        let aggregate_setting = HANDLE_MACOS_AGGREGATES
+            .lock()
+            .ok()
+            .and_then(|guard| *guard)
+            .unwrap_or(true);
         debug!(
             "Configure MacOS Aggregates: {:?}",
-            HANDLE_MACOS_AGGREGATES.lock().unwrap().unwrap()
+            aggregate_setting
         );
     }
     if is_root() {
         if args.force_root {
-            error!("GoXLR Utility running as root, this is generally considered bad.");
+            error!("MacXLR running as root, this is generally considered bad.");
         } else {
-            error!("The GoXLR Utility Daemon is not designed to be run as root, and should run");
+            error!("The MacXLR daemon is not designed to be run as root, and should run");
             error!("as the current active user. If you're having problems with permissions,");
             error!("please consult the 'Permissions' section of the README. Running as root");
             error!("*WILL* cause issues with the sampler, and may pose a security risk.");
@@ -241,11 +248,15 @@ async fn run_utility() -> Result<()> {
     }
 
     if let Some(device) = args.override_sample_input_device {
-        OVERRIDE_SAMPLER_INPUT.lock().unwrap().replace(device);
+        if let Ok(mut override_input) = OVERRIDE_SAMPLER_INPUT.lock() {
+            override_input.replace(device);
+        }
     }
 
     if let Some(device) = args.override_sample_output_device {
-        OVERRIDE_SAMPLER_OUTPUT.lock().unwrap().replace(device);
+        if let Ok(mut override_output) = OVERRIDE_SAMPLER_OUTPUT.lock() {
+            override_output.replace(device);
+        }
     }
 
     info!("Starting GoXLR Daemon v{}", VERSION);
@@ -298,8 +309,8 @@ async fn run_utility() -> Result<()> {
 
     // Configure Showing the Tray Icon
     let show_tray = Arc::new(AtomicBool::new(settings.get_show_tray_icon().await));
-    if let Some(override_tray) = args.disable_tray {
-        show_tray.store(override_tray, Ordering::Relaxed);
+    if let Some(disable_tray) = args.disable_tray {
+        show_tray.store(!disable_tray, Ordering::Relaxed);
     }
 
     // Configure, and Start the File Manager Service..

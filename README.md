@@ -1,11 +1,11 @@
-[![Support Server](https://img.shields.io/discord/1124010710138106017.svg?label=Discord&logo=Discord&colorB=7289da&style=flat)](https://discord.gg/BRBjkkbvmZ)
-[![GitHub tag (latest SemVer pre-release)](https://img.shields.io/github/v/tag/goxlr-on-linux/goxlr-utility?label=Latest)](http://github.com/goxlr-on-linux/goxlr-utility/releases/latest)
-![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/goxlr-on-linux/goxlr-utility/build.yml)
+Based on [GoXLR Utility](https://github.com/GoXLR-on-Linux/goxlr-utility)
 
-## GoXLR Configuration Utility
+## MacXLR
 
-An unofficial tool to configure and control a TC-Helicon GoXLR or GoXLR Mini on Linux, MacOS and
-Windows. [Click Here](https://discord.gg/BRBjkkbvmZ) to join our discord!
+MacXLR is a macOS-focused fork of GoXLR Utility for configuring and controlling a TC-Helicon
+GoXLR or GoXLR Mini. It is based on the original
+[GoXLR Utility](https://github.com/GoXLR-on-Linux/goxlr-utility), but this fork is intended to
+evolve independently with macOS-specific fixes, packaging, and quality-of-life improvements.
 
 ## Features
 
@@ -22,32 +22,22 @@ Windows. [Click Here](https://discord.gg/BRBjkkbvmZ) to join our discord!
 
 ## Downloads
 
-Downloads are available on the [Releases Page](https://github.com/GoXLR-on-Linux/goxlr-utility/releases/latest) under
-the
-'Assets' header, we currently provide the following files:
+MacXLR is currently being developed as an independent fork for macOS. If you publish releases for
+this fork, point users at your own GitHub Releases page rather than the upstream GoXLR Utility
+releases.
 
-* `.exe` files, usable on Windows<sup>1</sup>
-* `.pkg` files, usable on MacOS, both Intel and M1 based packages are available<sup>2</sup>
-* `.deb` files, usable on Debian based systems (Ubuntu, Mint, Pop!_OS, etc)
-* `.rpm` files, usable on Redhat based systems (CentOS, Fedora, etc)
+For local development and daily use on macOS, the simplest path is the included local app bundle
+script:
 
-### OS / Distro Specific Notes
+```bash
+./scripts/build-local-macos-app.sh
+open "dist/MacXLR.app"
+```
 
-* If you are running Ubuntu 24.04 or a derivitive (such as Linux Mint), please review
-  [this issue](https://github.com/GoXLR-on-Linux/goxlr-utility/issues/221)
-* If you're running the Mix 2 firmware and are seeing UCM errors, please
-  review [this issue](https://github.com/GoXLR-on-Linux/goxlr-utility/issues/223)
-* Arch users can install the `goxlr-utility` package from [AUR](https://aur.archlinux.org/packages/goxlr-utility)
-* Fedora Atomic or Bazzite users please check the instructions
-  [here](https://github.com/GoXLR-on-Linux/goxlr-utility/wiki/Fedora-Atomic-&-Bazzite)
-* Windows users can also aquire the GoXLR Utility via `winget`
+Attribution note:
 
-<sup>1</sup> Windows requires the official device drivers provided by TC-Helicon. If you have the official app
-installed you don't need to do anything, otherwise download the latest drivers from TC-Helicon's
-website [here](https://mediadl.musictribe.com/media/PLM/sftp/incoming/hybris/import/goxlr/driverRepair/TC-Helicon_GoXLR_Driver.zip).
-
-<sup>2</sup> MacOS support is still somewhat experimental, and the package may conflict with the existing
-GoXLR-MacOS project as they attempt to do the same thing in certain situations.
+MacXLR remains based on the original GoXLR Utility project, but the packaging, fixes, and fork
+direction in this repository are intentionally separate from upstream.
 
 ## Integrations
 
@@ -60,12 +50,13 @@ GoXLR-MacOS project as they attempt to do the same thing in certain situations.
 
 ## Getting Started
 
-Once installed, you can launch the Utility using the `GoXLR Utility` item in your Applications Menu, this will launch
+Once installed, you can launch the Utility using the `MacXLR` item in your Applications Menu, this will launch
 the utility and configuration UI. The UI will then be accessible via the system tray icon, or (if you don't have a tray)
-by re-running the `GoXLR Utility` menu item.
+by re-running the `MacXLR` menu item.
 
-If you're running on Linux, a first configuration step should be to enable `Autostart on Login` via System -> Settings.
-Windows users will get the choice during installation. If you change your mind, you can change the setting.
+If you're running on Linux, a first configuration step should be to enable `Autostart on Login`
+via System -> Settings. Windows users will get the choice during installation. If you change your
+mind, you can change the setting.
 
 If you want to import your profiles from the official app, simply click on the folder icon in the top right of the
 relevant profiles pane (either Main or Mic) which will open the directory in your file browser. Copy the profile across
@@ -93,15 +84,28 @@ and change the UI Handler there.
 
 ## Building
 
-Build instructions and other useful information can be found on the
-project's [wiki](https://github.com/GoXLR-on-Linux/goxlr-utility/wiki/Compilation-Guide).
-While it's a little sparse at the moment, over time it should grow, and requests / feedback are always welcome!
+Build instructions for the original project can still be useful as reference:
+[GoXLR Utility compilation guide](https://github.com/GoXLR-on-Linux/goxlr-utility/wiki/Compilation-Guide).
+MacXLR may diverge from upstream packaging and macOS behavior over time.
+
+### Local macOS App Bundle
+
+If you're working on the utility locally on macOS and want a simple `.app` bundle for daily use,
+this repo now includes a local packaging script:
+
+```bash
+./scripts/build-local-macos-app.sh
+open "dist/MacXLR.app"
+```
+
+This produces a local app bundle containing the Rust binaries from `target/release/`. It does not
+build the separate Tauri desktop UI project or a signed `.pkg`, but it gives you a native-feeling
+launcher for local testing and personal use on macOS.
 
 ## Disclaimer
 
 This project is also not supported by, or affiliated in any way with, TC-Helicon. For the official GoXLR software,
 please refer to their website.
 
-In addition, this project accepts no responsibility or liability for use of this software, or any problems which may
-occur from its use. Please read the [LICENSE](https://github.com/GoXLR-on-Linux/goxlr-utility/blob/main/LICENSE) for
-more information.
+In addition, this project accepts no responsibility or liability for use of this software, or any
+problems which may occur from its use. Please read the [LICENSE](LICENSE) for more information.

@@ -159,17 +159,19 @@ impl FileManager {
             let format = format!("{}/**/*.{}", path.to_string_lossy(), extension);
             let files = glob(format.as_str());
             if let Ok(files) = files {
-                files.for_each(|f| paths.push(f.unwrap()));
+                files.flatten().for_each(|f| paths.push(f));
             }
         }
 
         let mut map: BTreeMap<String, String> = BTreeMap::new();
         // Ok, we need to split stuff up..
         for file_path in paths {
-            map.insert(
-                file_path.to_string_lossy()[path.to_string_lossy().len() + 1..].to_string(),
-                file_path.file_name().unwrap().to_string_lossy().to_string(),
-            );
+            if let Some(file_name) = file_path.file_name() {
+                map.insert(
+                    file_path.to_string_lossy()[path.to_string_lossy().len() + 1..].to_string(),
+                    file_name.to_string_lossy().to_string(),
+                );
+            }
         }
         map
     }
@@ -202,7 +204,9 @@ impl FileManager {
                         // Is it the extension we're looking for?
                         .filter(|e| {
                             let path = e.path();
-                            let os_ext = path.extension().unwrap();
+                            let Some(os_ext) = path.extension() else {
+                                return false;
+                            };
                             for extension in extensions.clone() {
                                 if extension == os_ext {
                                     return true;
@@ -240,14 +244,13 @@ pub async fn spawn_file_notification_service(
     sender: Sender<PathTypes>,
     mut shutdown_signal: Shutdown,
 ) -> Result<()> {
-    let watcher = create_watcher();
-    if let Err(error) = watcher {
-        warn!("Error Creating the File Watcher, aborting: {:?}", error);
-        bail!("Error Creating the File Watcher: {:?}", error);
-    }
-
-    // Create the worker..
-    let (mut watcher, mut rx) = watcher.unwrap();
+    let (mut watcher, mut rx) = match create_watcher() {
+        Ok(watcher) => watcher,
+        Err(error) => {
+            warn!("Error Creating the File Watcher, aborting: {:?}", error);
+            bail!("Error Creating the File Watcher: {:?}", error);
+        }
+    };
 
     // Add the Paths to the Watcher..
     if let Err(error) = watcher.watch(&paths.profiles, RecursiveMode::NonRecursive) {
@@ -353,9 +356,9 @@ pub fn find_file_in_path(path: PathBuf, file: PathBuf) -> Option<PathBuf> {
     let format = format!("{}/**/{}", path.to_string_lossy(), file.to_string_lossy());
     let files = glob(format.as_str());
     if let Ok(files) = files
-        && let Some(file) = files.into_iter().next()
+        && let Some(file) = files.flatten().next()
     {
-        return Some(file.unwrap());
+        return Some(file);
     }
 
     None
