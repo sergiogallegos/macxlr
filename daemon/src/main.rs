@@ -306,8 +306,8 @@ async fn run_utility() -> Result<()> {
 
     // Configure Showing the Tray Icon
     let show_tray = Arc::new(AtomicBool::new(settings.get_show_tray_icon().await));
-    if let Some(disable_tray) = args.disable_tray {
-        show_tray.store(!disable_tray, Ordering::Relaxed);
+    if args.disable_tray {
+        show_tray.store(false, Ordering::Relaxed);
     }
 
     // Configure, and Start the File Manager Service..

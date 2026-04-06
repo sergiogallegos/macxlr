@@ -245,7 +245,6 @@ fn spawn_daemon(path: &Path) -> Result<Child> {
 
     let mut command = Command::new(path);
     command.arg("--disable-tray");
-    command.arg("true");
     command.arg("--log-level");
     command.arg("info");
     command.stdin(Stdio::null());
@@ -263,27 +262,40 @@ fn spawn_daemon(path: &Path) -> Result<Child> {
 
 fn locate_daemon_binary(app: &AppHandle) -> Result<PathBuf> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let host_tuple = std::env::consts::ARCH.to_string() + "-apple-darwin";
-    let bundled_sidecar_name = format!("{SIDECAR_BASENAME}-{host_tuple}");
+    let mut bundled_sidecar_names = vec![format!(
+        "{SIDECAR_BASENAME}-{}-apple-darwin",
+        std::env::consts::ARCH
+    )];
+    if std::env::consts::ARCH == "arm64" {
+        bundled_sidecar_names.push(format!("{SIDECAR_BASENAME}-aarch64-apple-darwin"));
+    }
     let mut candidates = vec![
         manifest_dir.join("../../target/debug/goxlr-daemon"),
         manifest_dir.join("../../target/release/goxlr-daemon"),
         manifest_dir.join("../../dist/MacXLR.app/Contents/MacOS/goxlr-daemon"),
-        manifest_dir.join(format!("../src-tauri/binaries/{bundled_sidecar_name}")),
     ];
+    for bundled_sidecar_name in &bundled_sidecar_names {
+        candidates.push(manifest_dir.join(format!("../src-tauri/binaries/{bundled_sidecar_name}")));
+    }
 
     if let Ok(resource_dir) = app.path().resource_dir() {
         candidates.push(resource_dir.join("goxlr-daemon"));
         candidates.push(resource_dir.join("bin/goxlr-daemon"));
-        candidates.push(resource_dir.join(&bundled_sidecar_name));
+        for bundled_sidecar_name in &bundled_sidecar_names {
+            candidates.push(resource_dir.join(bundled_sidecar_name));
+        }
     }
 
     if let Ok(current_exe) = std::env::current_exe() {
         if let Some(parent) = current_exe.parent() {
             candidates.push(parent.join("goxlr-daemon"));
-            candidates.push(parent.join(&bundled_sidecar_name));
+            for bundled_sidecar_name in &bundled_sidecar_names {
+                candidates.push(parent.join(bundled_sidecar_name));
+            }
             candidates.push(parent.join("../Resources/goxlr-daemon"));
-            candidates.push(parent.join(format!("../Resources/{bundled_sidecar_name}")));
+            for bundled_sidecar_name in &bundled_sidecar_names {
+                candidates.push(parent.join(format!("../Resources/{bundled_sidecar_name}")));
+            }
         }
     }
 

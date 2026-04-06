@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum};
+use clap::{ArgAction, Parser, ValueEnum};
 use directories::ProjectDirs;
 use std::path::PathBuf;
 
@@ -34,8 +34,8 @@ pub struct Cli {
     pub http_bind_address: Option<String>,
 
     /// Disable the Tray Icon
-    #[arg(long)]
-    pub disable_tray: Option<bool>,
+    #[arg(long, action = ArgAction::SetTrue)]
+    pub disable_tray: bool,
 
     /// Force Run the Daemon as Root
     #[arg(long)]
