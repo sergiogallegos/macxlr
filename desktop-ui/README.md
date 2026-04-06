@@ -41,9 +41,34 @@ This produces a self-contained app bundle at:
 dist/MacXLR Desktop.app
 ```
 
+And a DMG when bundling succeeds:
+
+```bash
+dist/MacXLR Desktop_*.dmg
+```
+
 After the build finishes, drag `dist/MacXLR Desktop.app` into `/Applications` and launch it like a
 normal macOS app. The bundled app includes `goxlr-daemon`, so it is ready to run immediately after
 the build.
+
+## Build a signed and notarized macOS app
+
+1. Copy the example env file:
+
+```bash
+cp .env.macos-desktop-signing.example .env.macos-desktop-signing
+```
+
+2. Fill in your Apple signing identity and notarization credentials.
+
+3. Run:
+
+```bash
+./scripts/build-signed-macos-desktop-app.sh
+```
+
+Tauri uses the documented Apple environment variables for macOS signing and notarization, including
+`APPLE_SIGNING_IDENTITY`, plus either App Store Connect API credentials or Apple ID credentials.
 
 ## Development run
 

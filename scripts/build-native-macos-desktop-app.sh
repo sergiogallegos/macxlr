@@ -36,8 +36,18 @@ echo "Copying app bundle to $APP_DST"
 rm -rf "$APP_DST"
 cp -R "$APP_SRC" "$APP_DST"
 
+DMG_SRC="$(find "$TAURI_DIR/target/release/bundle/dmg" -maxdepth 1 -name 'MacXLR Desktop_*.dmg' 2>/dev/null | head -n1 || true)"
+if [ -n "${DMG_SRC:-}" ] && [ -f "$DMG_SRC" ]; then
+  DMG_DST="$DIST_DIR/$(basename "$DMG_SRC")"
+  echo "Copying DMG to $DMG_DST"
+  cp "$DMG_SRC" "$DMG_DST"
+fi
+
 echo
 echo "Desktop app ready:"
 echo "  $APP_DST"
+if [ -n "${DMG_DST:-}" ]; then
+  echo "  $DMG_DST"
+fi
 echo
 echo "You can now drag it into /Applications and launch it like a normal macOS app."

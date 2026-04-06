@@ -40,6 +40,15 @@ button:hover {
   background: #fffaf0;
 }
 
+.secondary-button {
+  color: #f3efe6;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.secondary-button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .app-shell {
   width: 100%;
   height: 100%;
@@ -93,6 +102,45 @@ button:hover {
 .overlay-copy {
   margin: 0;
   color: rgba(248, 246, 241, 0.72);
+}
+
+.error-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.error-message {
+  margin: 0;
+  color: #f8f6f1;
+}
+
+.log-block {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.log-label {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f0b27f;
+}
+
+.log-block code {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 0.83rem;
+  color: rgba(248, 246, 241, 0.78);
+  word-break: break-all;
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .spinner {

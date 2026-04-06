@@ -77,6 +77,12 @@ This creates:
 dist/MacXLR Desktop.app
 ```
 
+And, when the Tauri bundle step completes, a DMG:
+
+```bash
+dist/MacXLR Desktop_*.dmg
+```
+
 That app bundle includes the desktop shell plus a bundled `goxlr-daemon` sidecar, so it is ready
 for local macOS use after the build completes.
 
@@ -92,6 +98,19 @@ For desktop-shell development without producing a release app bundle:
 ```bash
 ./scripts/run-native-macos-desktop.sh
 ```
+
+### Signed And Notarized macOS Builds
+
+To prepare a distribution-ready desktop build with Apple signing and notarization credentials:
+
+```bash
+cp .env.macos-desktop-signing.example .env.macos-desktop-signing
+./scripts/build-signed-macos-desktop-app.sh
+```
+
+That flow uses Tauri's documented macOS environment variables such as
+`APPLE_SIGNING_IDENTITY`, `APPLE_API_ISSUER`, `APPLE_API_KEY`, `APPLE_API_KEY_PATH`, `APPLE_ID`,
+`APPLE_PASSWORD`, and `APPLE_TEAM_ID`.
 
 ## Integrations
 

@@ -6,6 +6,10 @@ type DaemonStatus = {
   spawned: boolean;
   url: string;
   lastError: string | null;
+  logDir: string;
+  startupLog: string;
+  daemonStdoutLog: string;
+  daemonStderrLog: string;
 };
 
 async function loadDaemonStatus(): Promise<DaemonStatus> {
@@ -14,6 +18,10 @@ async function loadDaemonStatus(): Promise<DaemonStatus> {
 
 async function ensureDaemonStarted(): Promise<DaemonStatus> {
   return invoke<DaemonStatus>("ensure_daemon_started");
+}
+
+async function openLogDirectory(): Promise<void> {
+  return invoke("open_log_directory");
 }
 
 export default function App() {
@@ -43,7 +51,11 @@ export default function App() {
           spawned: current?.spawned ?? false,
           url: current?.url ?? "http://localhost:14564/",
           lastError:
-            error instanceof Error ? error.message : "Unknown daemon startup failure"
+            error instanceof Error ? error.message : "Unknown daemon startup failure",
+          logDir: current?.logDir ?? "",
+          startupLog: current?.startupLog ?? "",
+          daemonStdoutLog: current?.daemonStdoutLog ?? "",
+          daemonStderrLog: current?.daemonStderrLog ?? ""
         }));
       }
     };
@@ -82,36 +94,64 @@ export default function App() {
             </h1>
             <p className="overlay-copy">
               {status === "error"
-                ? details?.lastError ?? "No error details available."
+                ? "The desktop app could not finish starting the background mixer service."
                 : "Launching the bundled daemon and waiting for the GoXLR interface."}
             </p>
             {status === "error" ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setStatus("booting");
-                  void ensureDaemonStarted()
-                    .then((next) => {
-                      setDetails(next);
-                      setStatus(next.ready ? "ready" : "booting");
-                      setReloadKey((value) => value + 1);
-                    })
-                    .catch((error) => {
-                      setStatus("error");
-                      setDetails((current) => ({
-                        ready: false,
-                        spawned: current?.spawned ?? false,
-                        url: current?.url ?? "http://localhost:14564/",
-                        lastError:
-                          error instanceof Error
-                            ? error.message
-                            : "Unknown daemon startup failure"
-                      }));
-                    });
-                }}
-              >
-                Retry
-              </button>
+              <>
+                <div className="error-panel">
+                  <p className="error-message">
+                    {details?.lastError ?? "No error details were captured."}
+                  </p>
+                  <div className="log-block">
+                    <p className="log-label">Logs</p>
+                    <code>{details?.startupLog}</code>
+                    <code>{details?.daemonStdoutLog}</code>
+                    <code>{details?.daemonStderrLog}</code>
+                  </div>
+                </div>
+                <div className="button-row">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatus("booting");
+                      void ensureDaemonStarted()
+                        .then((next) => {
+                          setDetails(next);
+                          setStatus(next.ready ? "ready" : "booting");
+                          setReloadKey((value) => value + 1);
+                        })
+                        .catch((error) => {
+                          setStatus("error");
+                          setDetails((current) => ({
+                            ready: false,
+                            spawned: current?.spawned ?? false,
+                            url: current?.url ?? "http://localhost:14564/",
+                            lastError:
+                              error instanceof Error
+                                ? error.message
+                                : "Unknown daemon startup failure",
+                            logDir: current?.logDir ?? "",
+                            startupLog: current?.startupLog ?? "",
+                            daemonStdoutLog: current?.daemonStdoutLog ?? "",
+                            daemonStderrLog: current?.daemonStderrLog ?? ""
+                          }));
+                        });
+                    }}
+                  >
+                    Retry
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => {
+                      void openLogDirectory();
+                    }}
+                  >
+                    Open Logs
+                  </button>
+                </div>
+              </>
             ) : (
               <div className="spinner" aria-hidden="true" />
             )}

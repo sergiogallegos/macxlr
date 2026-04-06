@@ -16,3 +16,4 @@
 /desktop-ui/src-tauri/target/
 /desktop-ui/src-tauri/binaries/*
 !/desktop-ui/src-tauri/binaries/.gitkeep
+/.env.macos-desktop-signing

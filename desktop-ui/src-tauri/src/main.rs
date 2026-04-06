@@ -35,6 +35,10 @@ struct DaemonStatus {
     spawned: bool,
     url: String,
     last_error: Option<String>,
+    log_dir: String,
+    startup_log: String,
+    daemon_stdout_log: String,
+    daemon_stderr_log: String,
 }
 
 #[tauri::command]
@@ -46,6 +50,16 @@ fn get_daemon_status(state: State<'_, ManagedDaemon>) -> DaemonStatus {
         spawned,
         url: DEFAULT_UI_URL.to_string(),
         last_error: get_last_error(&state),
+        log_dir: startup_log_dir().display().to_string(),
+        startup_log: startup_log_dir().join("startup.log").display().to_string(),
+        daemon_stdout_log: startup_log_dir()
+            .join("goxlr-daemon.stdout.log")
+            .display()
+            .to_string(),
+        daemon_stderr_log: startup_log_dir()
+            .join("goxlr-daemon.stderr.log")
+            .display()
+            .to_string(),
     }
 }
 
@@ -64,6 +78,16 @@ fn ensure_daemon_started(
             spawned: daemon_is_spawned(&state),
             url: DEFAULT_UI_URL.to_string(),
             last_error: None,
+            log_dir: startup_log_dir().display().to_string(),
+            startup_log: startup_log_dir().join("startup.log").display().to_string(),
+            daemon_stdout_log: startup_log_dir()
+                .join("goxlr-daemon.stdout.log")
+                .display()
+                .to_string(),
+            daemon_stderr_log: startup_log_dir()
+                .join("goxlr-daemon.stderr.log")
+                .display()
+                .to_string(),
         });
     }
 
@@ -106,7 +130,30 @@ fn ensure_daemon_started(
         spawned: true,
         url: DEFAULT_UI_URL.to_string(),
         last_error: None,
+        log_dir: startup_log_dir().display().to_string(),
+        startup_log: startup_log_dir().join("startup.log").display().to_string(),
+        daemon_stdout_log: startup_log_dir()
+            .join("goxlr-daemon.stdout.log")
+            .display()
+            .to_string(),
+        daemon_stderr_log: startup_log_dir()
+            .join("goxlr-daemon.stderr.log")
+            .display()
+            .to_string(),
     })
+}
+
+#[tauri::command]
+fn open_log_directory() -> std::result::Result<(), String> {
+    let log_dir = startup_log_dir();
+    create_dir_all(&log_dir).map_err(|error| error.to_string())?;
+
+    Command::new("open")
+        .arg(&log_dir)
+        .spawn()
+        .map_err(|error| format!("Unable to open {}: {error}", log_dir.display()))?;
+
+    Ok(())
 }
 
 fn main() {
@@ -114,7 +161,8 @@ fn main() {
         .manage(ManagedDaemon::default())
         .invoke_handler(tauri::generate_handler![
             ensure_daemon_started,
-            get_daemon_status
+            get_daemon_status,
+            open_log_directory
         ])
         .build(tauri::generate_context!())
         .expect("failed to build MacXLR Desktop");

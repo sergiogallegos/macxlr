@@ -28,7 +28,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": "app",
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "externalBin": [
       "binaries/goxlr-daemon"
     ],
@@ -36,7 +39,24 @@
       "../../daemon/resources/icon.icns"
     ],
     "macOS": {
-      "minimumSystemVersion": "13.0"
+      "minimumSystemVersion": "13.0",
+      "exceptionDomain": "localhost",
+      "signingIdentity": "-",
+      "hardenedRuntime": true,
+      "dmg": {
+        "windowSize": {
+          "width": 780,
+          "height": 520
+        },
+        "appPosition": {
+          "x": 220,
+          "y": 250
+        },
+        "applicationFolderPosition": {
+          "x": 560,
+          "y": 250
+        }
+      }
     }
   }
 }
