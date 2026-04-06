@@ -1,0 +1,111 @@
+:root {
+  color: #f8f6f1;
+  background: #14171d;
+  font-family: "Avenir Next", "SF Pro Display", "Helvetica Neue", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.8rem 1.2rem;
+  font: inherit;
+  color: #10141b;
+  background: #f3efe6;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #fffaf0;
+}
+
+.app-shell {
+  width: 100%;
+  height: 100%;
+  background: #14171d;
+}
+
+.ui-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #14171d;
+}
+
+.overlay {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(215, 125, 73, 0.18), transparent 30%),
+    linear-gradient(180deg, #161a21 0%, #11151b 100%);
+}
+
+.overlay-card {
+  display: grid;
+  gap: 14px;
+  width: min(540px, 100%);
+  padding: 28px 30px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  background: rgba(15, 19, 26, 0.82);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+}
+
+.overlay-label {
+  margin: 0;
+  font-size: 0.76rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #f0b27f;
+}
+
+.overlay-title {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  line-height: 0.96;
+}
+
+.overlay-copy {
+  margin: 0;
+  color: rgba(248, 246, 241, 0.72);
+}
+
+.spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(255, 255, 255, 0.14);
+  border-top-color: #7bbdaf;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

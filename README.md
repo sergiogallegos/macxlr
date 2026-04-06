@@ -49,6 +49,46 @@ open "dist/MacXLR.app"
 MacXLR remains based on the original GoXLR Utility project, but the packaging, fixes, and fork
 direction in this repository are intentionally separate from upstream.
 
+## Native macOS Desktop Shell
+
+This repository now also includes a separate native desktop UI project at
+[`desktop-ui/`](/Users/sergiogallegos/projects/goxlr-utility/desktop-ui). It uses Tauri 2 with
+React, TypeScript, and Vite to run the existing MacXLR interface inside a native macOS app window
+instead of opening a browser tab.
+
+Current scope:
+
+* The desktop shell starts `goxlr-daemon`
+* The daemon still serves the existing configuration UI on `http://127.0.0.1:14564/`
+* The Tauri app auto-starts into the GoXLR interface and keeps the window presentation clean so it
+  feels like a direct macOS app rather than a separate dashboard wrapped around the UI
+
+### Build A macOS App Bundle
+
+To build a macOS desktop app you can drag straight into `/Applications`, run:
+
+```bash
+./scripts/build-native-macos-desktop-app.sh
+```
+
+This creates:
+
+```bash
+dist/MacXLR Desktop.app
+```
+
+That app bundle includes the desktop shell plus a bundled `goxlr-daemon` sidecar, so it is ready
+for local macOS use after the build completes.
+
+When you launch `MacXLR Desktop.app`, it automatically starts the bundled daemon and opens straight
+into the GoXLR interface inside the native macOS window.
+
+For desktop-shell development without producing a release app bundle:
+
+```bash
+./scripts/run-native-macos-desktop.sh
+```
+
 ## Integrations
 
 * [twitchat](https://twitchat.fr/) - Activate and change GoXLR settings based on twitch bits / donations (Thanks Durss!)

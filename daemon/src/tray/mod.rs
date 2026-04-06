@@ -1,6 +1,7 @@
 use crate::DaemonState;
 use crate::events::EventTriggers;
 use anyhow::Result;
+use std::sync::atomic::Ordering;
 use tokio::sync::mpsc;
 
 #[cfg(target_os = "linux")]
@@ -26,11 +27,19 @@ pub fn handle_tray(state: DaemonState, tx: mpsc::Sender<EventTriggers>) -> Resul
 
     #[cfg(target_os = "macos")]
     {
-        macos::handle_tray(state, tx)
+        if state.show_tray.load(Ordering::Relaxed) {
+            macos::handle_tray(state, tx)
+        } else {
+            Ok(())
+        }
     }
     #[cfg(target_os = "windows")]
     {
-        windows::handle_tray(state, tx)
+        if state.show_tray.load(Ordering::Relaxed) {
+            windows::handle_tray(state, tx)
+        } else {
+            Ok(())
+        }
     }
 
     // For all other platforms, don't attempt to spawn a Tray Icon
