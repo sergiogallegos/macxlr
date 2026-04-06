@@ -219,10 +219,7 @@ async fn run_utility() -> Result<()> {
             .ok()
             .and_then(|guard| *guard)
             .unwrap_or(true);
-        debug!(
-            "Configure MacOS Aggregates: {:?}",
-            aggregate_setting
-        );
+        debug!("Configure MacOS Aggregates: {:?}", aggregate_setting);
     }
     if is_root() {
         if args.force_root {

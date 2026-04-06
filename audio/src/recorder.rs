@@ -255,7 +255,10 @@ impl BufferedRecorder {
         match self.producers.lock() {
             Ok(mut producers) => producers.retain(|x| x.id != producer_id),
             Err(error) => {
-                warn!("Unable to remove recorder producer {}: {}", producer_id, error);
+                warn!(
+                    "Unable to remove recorder producer {}: {}",
+                    producer_id, error
+                );
             }
         }
     }

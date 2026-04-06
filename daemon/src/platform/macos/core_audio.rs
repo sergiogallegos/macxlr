@@ -17,10 +17,9 @@ use core_foundation::string::{CFString, CFStringRef};
 use coreaudio_sys::{
     AudioDeviceID, AudioObjectGetPropertyData, AudioObjectGetPropertyDataSize, AudioObjectID,
     AudioObjectPropertyAddress, AudioObjectSetPropertyData, AudioValueTranslation, KERN_SUCCESS,
-    kAudioAggregateDevicePropertyFullSubDeviceList, kAudioDevicePropertyDeviceUID,
-    kAudioDevicePropertyDeviceNameCFString,
-    kAudioDevicePropertyPreferredChannelsForStereo, kAudioHardwareNoError,
-    kAudioHardwarePropertyDevices, kAudioHardwarePropertyPlugInForBundleID,
+    kAudioAggregateDevicePropertyFullSubDeviceList, kAudioDevicePropertyDeviceNameCFString,
+    kAudioDevicePropertyDeviceUID, kAudioDevicePropertyPreferredChannelsForStereo,
+    kAudioHardwareNoError, kAudioHardwarePropertyDevices, kAudioHardwarePropertyPlugInForBundleID,
     kAudioObjectPropertyElementMaster, kAudioObjectPropertyScopeGlobal,
     kAudioObjectPropertyScopeInput, kAudioObjectPropertyScopeOutput, kAudioObjectSystemObject,
     kAudioObjectUnknown, kAudioPlugInCreateAggregateDevice, kAudioPlugInDestroyAggregateDevice,
@@ -469,11 +468,7 @@ pub fn get_goxlr_devices() -> Result<Vec<CoreAudioDevice>> {
                             warn!("GoXLR device contained non-string description");
                             continue;
                         };
-                        debug!(
-                            "Found GoXLR CoreAudio device: {} ({})",
-                            description,
-                            uid
-                        );
+                        debug!("Found GoXLR CoreAudio device: {} ({})", description, uid);
                         devices.push(CoreAudioDevice {
                             display_name: description.to_string(),
                             uid: uid.to_string(),
@@ -485,7 +480,9 @@ pub fn get_goxlr_devices() -> Result<Vec<CoreAudioDevice>> {
     }
 
     if devices.is_empty() {
-        trace!("No GoXLR devices found via IOAudioEngine metadata, falling back to CoreAudio device list");
+        trace!(
+            "No GoXLR devices found via IOAudioEngine metadata, falling back to CoreAudio device list"
+        );
 
         for device_id in get_all_audio_device_ids()? {
             let Ok(uid) = get_uid_for_id(device_id) else {

@@ -168,8 +168,7 @@ fn percent_value(s: &str) -> Result<u8, String> {
 }
 
 fn percent_value_float(s: &str) -> Result<f32, String> {
-    let value =
-        f32::from_str(s).map_err(|_| String::from("Value must be between 0 and 100"))?;
+    let value = f32::from_str(s).map_err(|_| String::from("Value must be between 0 and 100"))?;
     if !(0.0..=100.0).contains(&value) {
         return Err(String::from("Value must be between 0 and 100"));
     }

@@ -131,7 +131,10 @@ impl CpalConfiguration {
                 continue;
             };
             let Ok(devices) = host.output_devices() else {
-                warn!("Unable to enumerate output devices for host {}", host_id.name());
+                warn!(
+                    "Unable to enumerate output devices for host {}",
+                    host_id.name()
+                );
                 continue;
             };
             for device in devices {
@@ -158,7 +161,10 @@ impl CpalConfiguration {
                 continue;
             };
             let Ok(devices) = host.input_devices() else {
-                warn!("Unable to enumerate input devices for host {}", host_id.name());
+                warn!(
+                    "Unable to enumerate input devices for host {}",
+                    host_id.name()
+                );
                 continue;
             };
             for device in devices {

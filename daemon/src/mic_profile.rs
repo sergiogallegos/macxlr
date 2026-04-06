@@ -62,11 +62,7 @@ impl MicProfileAdapter {
         .unwrap_or_else(|error| panic!("Default mic profile isn't available: {}", error))
     }
 
-    fn enum_value<T: Copy>(
-        mut iter: impl Iterator<Item = T>,
-        index: usize,
-        label: &str,
-    ) -> T {
+    fn enum_value<T: Copy>(mut iter: impl Iterator<Item = T>, index: usize, label: &str) -> T {
         iter.nth(index)
             .unwrap_or_else(|| panic!("Invalid {} enum index {}", label, index))
     }

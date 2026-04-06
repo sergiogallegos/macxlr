@@ -373,7 +373,8 @@ impl SettingsHandle {
 
     pub async fn get_device_shutdown_commands(&self, device_serial: &str) -> Vec<GoXLRCommand> {
         let settings = self.settings.read().await;
-        let value = Self::device_settings(&settings, device_serial).map(|d| d.shutdown_commands.clone());
+        let value =
+            Self::device_settings(&settings, device_serial).map(|d| d.shutdown_commands.clone());
 
         if let Some(value) = value {
             return value;
@@ -383,7 +384,8 @@ impl SettingsHandle {
 
     pub async fn get_device_sleep_commands(&self, device_serial: &str) -> Vec<GoXLRCommand> {
         let settings = self.settings.read().await;
-        let value = Self::device_settings(&settings, device_serial).map(|d| d.sleep_commands.clone());
+        let value =
+            Self::device_settings(&settings, device_serial).map(|d| d.sleep_commands.clone());
 
         if let Some(value) = value {
             return value;
@@ -393,7 +395,8 @@ impl SettingsHandle {
 
     pub async fn get_device_wake_commands(&self, device_serial: &str) -> Vec<GoXLRCommand> {
         let settings = self.settings.read().await;
-        let value = Self::device_settings(&settings, device_serial).map(|d| d.wake_commands.clone());
+        let value =
+            Self::device_settings(&settings, device_serial).map(|d| d.wake_commands.clone());
 
         if let Some(value) = value {
             return value;
@@ -413,8 +416,8 @@ impl SettingsHandle {
 
     pub async fn get_device_hold_time(&self, device_serial: &str) -> u16 {
         let settings = self.settings.read().await;
-        let value = Self::device_settings(&settings, device_serial)
-            .map(|d| d.hold_delay.unwrap_or(500));
+        let value =
+            Self::device_settings(&settings, device_serial).map(|d| d.hold_delay.unwrap_or(500));
 
         if let Some(value) = value {
             return value;
@@ -436,8 +439,8 @@ impl SettingsHandle {
 
     pub async fn get_device_lock_faders(&self, device_serial: &str) -> bool {
         let settings = self.settings.read().await;
-        let value = Self::device_settings(&settings, device_serial)
-            .map(|d| d.lock_faders.unwrap_or(true));
+        let value =
+            Self::device_settings(&settings, device_serial).map(|d| d.lock_faders.unwrap_or(true));
 
         if let Some(value) = value {
             return value;
@@ -457,8 +460,8 @@ impl SettingsHandle {
 
     pub async fn get_device_vod_mode(&self, device_serial: &str) -> VodMode {
         let settings = self.settings.read().await;
-        let value = Self::device_settings(&settings, device_serial)
-            .map(|d| d.vod_mode.unwrap_or(Routable));
+        let value =
+            Self::device_settings(&settings, device_serial).map(|d| d.vod_mode.unwrap_or(Routable));
 
         if let Some(value) = value {
             return value;

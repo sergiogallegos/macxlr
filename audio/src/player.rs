@@ -53,9 +53,8 @@ impl Player {
         stop_pct: Option<f64>,
         gain: Option<f64>,
     ) -> Result<Self> {
-        let probe = Player::load_file(file).map_err(|error| {
-            anyhow!("Unable to probe audio file {}: {}", file.display(), error)
-        })?;
+        let probe = Player::load_file(file)
+            .map_err(|error| anyhow!("Unable to probe audio file {}: {}", file.display(), error))?;
 
         Ok(Self {
             file: file.clone(),
@@ -179,7 +178,10 @@ impl Player {
                     if let Some(start_pct) = self.start_pct {
                         // Calculate the first frame based on the percent..
                         first_frame = Some(((frames as f64 / 100.0) * start_pct).round() as u64);
-                        debug!("Starting Sample: {}", first_frame.unwrap_or_default() * channels as u64);
+                        debug!(
+                            "Starting Sample: {}",
+                            first_frame.unwrap_or_default() * channels as u64
+                        );
                     }
 
                     if let Some(stop_pct) = self.stop_pct {

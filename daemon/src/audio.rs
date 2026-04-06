@@ -188,16 +188,16 @@ impl AudioHandler {
 
         Self::compile_patterns(
             &[
-            // Linux
-            "goxlr_sample",
-            "GoXLR_0_8_9",
-            "GoXLR.*HiFi__Line3__sink",
-            // MacOS
-            "CoreAudio\\*Sample(?:(?!Mini).)*$",
-            "CoreAudio\\*Sampler(?:(?!Mini).)*$",
-            "CoreAudio\\*GoXLR(?:(?!Mini).)*$",
-            // Windows
-            "^WASAPI\\*Sample(?:(?!Mini).)*$",
+                // Linux
+                "goxlr_sample",
+                "GoXLR_0_8_9",
+                "GoXLR.*HiFi__Line3__sink",
+                // MacOS
+                "CoreAudio\\*Sample(?:(?!Mini).)*$",
+                "CoreAudio\\*Sampler(?:(?!Mini).)*$",
+                "CoreAudio\\*GoXLR(?:(?!Mini).)*$",
+                // Windows
+                "^WASAPI\\*Sample(?:(?!Mini).)*$",
             ],
             "sampler output patterns",
         )
@@ -217,16 +217,16 @@ impl AudioHandler {
 
         Self::compile_patterns(
             &[
-            // Linux
-            "goxlr_sample.*source",
-            "GoXLR_0_4_5.*source",
-            "GoXLR.*HiFi__Line5__source",
-            // MacOS
-            "CoreAudio\\*Sampler(?:(?!Mini).)*$",
-            "CoreAudio\\*Sample(?:(?!Mini).)*$",
-            "CoreAudio\\*GoXLR(?:(?!Mini).)*$",
-            // Windows
-            "^WASAPI\\*Sample(?:(?!Mini).)*$",
+                // Linux
+                "goxlr_sample.*source",
+                "GoXLR_0_4_5.*source",
+                "GoXLR.*HiFi__Line5__source",
+                // MacOS
+                "CoreAudio\\*Sampler(?:(?!Mini).)*$",
+                "CoreAudio\\*Sample(?:(?!Mini).)*$",
+                "CoreAudio\\*GoXLR(?:(?!Mini).)*$",
+                // Windows
+                "^WASAPI\\*Sample(?:(?!Mini).)*$",
             ],
             "sampler input patterns",
         )

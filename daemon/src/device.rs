@@ -1548,7 +1548,8 @@ impl<'a> Device<'a> {
             let Some(audio_handler) = self.audio_handler.as_ref() else {
                 return Ok(false);
             };
-            let playing = audio_handler.is_sample_playing(self.profile.get_active_sample_bank(), button);
+            let playing =
+                audio_handler.is_sample_playing(self.profile.get_active_sample_bank(), button);
 
             if self.profile.is_sample_active(button) && !playing {
                 self.profile.set_sample_button_state(button, false);
