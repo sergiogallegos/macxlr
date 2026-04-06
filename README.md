@@ -83,6 +83,10 @@ for local macOS use after the build completes.
 When you launch `MacXLR Desktop.app`, it automatically starts the bundled daemon and opens straight
 into the GoXLR interface inside the native macOS window.
 
+Native macOS desktop app:
+
+![MacXLR Desktop on macOS](docs/images/macxlr-desktop-macos.png)
+
 For desktop-shell development without producing a release app bundle:
 
 ```bash
@@ -119,7 +123,7 @@ MacXLR serves a web UI directly from the daemon and can also wrap that UI in a d
 macOS. The interface stays close to the official GoXLR application so existing users do not have
 to relearn the mixer from scratch.
 
-![image](https://github.com/GoXLR-on-Linux/goxlr-utility/assets/574943/8f14bd2c-e67a-42e5-bd9f-b3cb367e171d)
+![MacXLR Desktop UI](docs/images/macxlr-desktop-macos.png)
 
 MacXLR is currently macOS-first. If you are working from upstream on Linux or Windows, use the
 original GoXLR Utility project and its platform-specific packaging.

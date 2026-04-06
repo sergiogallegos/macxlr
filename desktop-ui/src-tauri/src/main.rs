@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
+use std::fs::{OpenOptions, create_dir_all};
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -9,7 +10,7 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, State};
 
 const DEFAULT_UI_URL: &str = "http://localhost:14564/";
-const READY_TIMEOUT: Duration = Duration::from_secs(15);
+const READY_TIMEOUT: Duration = Duration::from_secs(30);
 const POLL_INTERVAL: Duration = Duration::from_millis(250);
 const SIDECAR_BASENAME: &str = "goxlr-daemon";
 
@@ -53,7 +54,10 @@ fn ensure_daemon_started(
     app: AppHandle,
     state: State<'_, ManagedDaemon>,
 ) -> std::result::Result<DaemonStatus, String> {
+    log_startup("ensure_daemon_started called");
+
     if is_ui_ready() {
+        log_startup("UI already reachable");
         clear_last_error(&state);
         return Ok(DaemonStatus {
             ready: true,
@@ -68,15 +72,19 @@ fn ensure_daemon_started(
     if !daemon_is_spawned(&state) {
         let daemon_path = locate_daemon_binary(&app).map_err(|error| {
             let message = format!("Unable to locate goxlr-daemon: {error:#}");
+            log_startup(&message);
             set_last_error(&state, message.clone());
             message
         })?;
+        log_startup(&format!("Using daemon binary at {}", daemon_path.display()));
 
         let child = spawn_daemon(&daemon_path).map_err(|error| {
             let message = format!("Unable to start goxlr-daemon: {error:#}");
+            log_startup(&message);
             set_last_error(&state, message.clone());
             message
         })?;
+        log_startup("Spawned daemon process");
 
         let mut guard = state.child.lock().expect("daemon child mutex poisoned");
         *guard = Some(child);
@@ -84,12 +92,14 @@ fn ensure_daemon_started(
 
     let started = wait_for_ui();
     if !started {
-        let message = "Timed out waiting for the daemon HTTP interface at http://127.0.0.1:14564/"
+        let message = "Timed out waiting for the daemon HTTP interface at http://localhost:14564/"
             .to_string();
+        log_startup(&message);
         set_last_error(&state, message.clone());
         return Err(message);
     }
 
+    log_startup("UI became reachable");
     clear_last_error(&state);
     Ok(DaemonStatus {
         ready: true,
@@ -169,14 +179,30 @@ fn stop_daemon(state: &ManagedDaemon) {
 }
 
 fn spawn_daemon(path: &Path) -> Result<Child> {
+    let log_dir = startup_log_dir();
+    create_dir_all(&log_dir).with_context(|| format!("creating {}", log_dir.display()))?;
+
+    let stdout_path = log_dir.join("goxlr-daemon.stdout.log");
+    let stderr_path = log_dir.join("goxlr-daemon.stderr.log");
+    let stdout = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&stdout_path)
+        .with_context(|| format!("opening {}", stdout_path.display()))?;
+    let stderr = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&stderr_path)
+        .with_context(|| format!("opening {}", stderr_path.display()))?;
+
     let mut command = Command::new(path);
     command.arg("--disable-tray");
     command.arg("true");
     command.arg("--log-level");
     command.arg("info");
     command.stdin(Stdio::null());
-    command.stdout(Stdio::null());
-    command.stderr(Stdio::null());
+    command.stdout(Stdio::from(stdout));
+    command.stderr(Stdio::from(stderr));
 
     if let Some(parent) = path.parent() {
         command.current_dir(parent);
@@ -250,4 +276,21 @@ fn clear_last_error(state: &ManagedDaemon) {
         .lock()
         .expect("daemon error mutex poisoned");
     *guard = None;
+}
+
+fn startup_log_dir() -> PathBuf {
+    std::env::temp_dir().join("macxlr-desktop")
+}
+
+fn log_startup(message: &str) {
+    let log_dir = startup_log_dir();
+    if create_dir_all(&log_dir).is_err() {
+        return;
+    }
+
+    let log_path = log_dir.join("startup.log");
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log_path) {
+        use std::io::Write;
+        let _ = writeln!(file, "{}", message);
+    }
 }
